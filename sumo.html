@@ -349,7 +349,11 @@
             gameState.gameTime = 60;
             const timer = setInterval(() => {
                 gameState.gameTime--;
-                if (gameState.gameTime <= 0 || getAlivePlayers().length <= 1) {
+                updateUI(); // Ensure UI updates during game
+                
+                const alivePlayers = getAlivePlayers();
+                // Only end game if time is up OR only one player remains
+                if (gameState.gameTime <= 0 || alivePlayers.length <= 1) {
                     clearInterval(timer);
                     endGame();
                 }
@@ -363,10 +367,52 @@
             const alivePlayers = getAlivePlayers();
             if (alivePlayers.length === 1) {
                 const winner = alivePlayers[0];
-                alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool} ETH!`);
+                setTimeout(() => {
+                    alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} ETH!`);
+                    resetGame();
+                }, 500);
+            } else if (alivePlayers.length === 0) {
+                setTimeout(() => {
+                    alert('💥 All players eliminated! No winner this round.');
+                    resetGame();
+                }, 500);
             } else {
-                alert('🕐 Time up! No winner this round.');
+                setTimeout(() => {
+                    alert('🕐 Time up! No clear winner this round.');
+                    resetGame();
+                }, 500);
             }
+        }
+
+        function resetGame() {
+            // Reset game state for a new round
+            gameState = {
+                players: new Map(),
+                powerups: [],
+                gameRunning: false,
+                gamePhase: 'waiting',
+                prizePool: 0,
+                myPlayerId: null,
+                countdown: 0,
+                gameTime: 60
+            };
+            
+            // Re-enable UI controls
+            document.getElementById('joinGame').disabled = false;
+            document.getElementById('startGame').style.display = 'none';
+            document.getElementById('connectWallet').disabled = walletConnected;
+            
+            // Clear player input state
+            Object.keys(keys).forEach(key => keys[key] = false);
+            
+            updateUI();
+            
+            // Add demo players again for testing
+            setTimeout(() => {
+                if (gameState.players.size === 0) {
+                    addDemoPlayers();
+                }
+            }, 1000);
         }
 
         function addDemoPlayers() {
@@ -406,15 +452,25 @@
         // Input handling
         const keys = {};
         function handleKeyDown(e) {
+            if (!gameState.gameRunning) return; // Only process input during active game
+            
             keys[e.key.toLowerCase()] = true;
             if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
                 const player = gameState.players.get(gameState.myPlayerId);
-                player.keys = keys;
+                if (player.alive) { // Only update if player is still alive
+                    player.keys = {...keys}; // Copy keys object
+                }
             }
         }
 
         function handleKeyUp(e) {
             keys[e.key.toLowerCase()] = false;
+            if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
+                const player = gameState.players.get(gameState.myPlayerId);
+                if (player.alive) { // Only update if player is still alive
+                    player.keys = {...keys}; // Copy keys object
+                }
+            }
         }
 
         // Game loop
@@ -436,9 +492,10 @@
                     updateAI(player);
                 }
                 
-                // Movement
-                const speed = player.powerup === 'SPEED' ? 0.8 : 0.4;
-                const force = (player.powerup === 'STRENGTH' ? 1.5 : 1) * (player.radius / 20);
+                // Movement - Increased base speed and power
+                const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7; // Increased from 0.8/0.4
+                const mass = player.radius / 15; // Mass factor based on size
+                const speed = baseSpeed / Math.sqrt(mass); // Bigger players move slower but hit harder
                 
                 if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed;
                 if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed;
@@ -449,15 +506,24 @@
                 player.x += player.vx;
                 player.y += player.vy;
                 
-                // Friction
-                player.vx *= 0.85;
-                player.vy *= 0.85;
+                // Reduced friction for more momentum
+                player.vx *= 0.92; // Was 0.85
+                player.vy *= 0.92;
                 
-                // Check ring boundaries
+                // Check ring boundaries with better elimination logic
                 const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
                 if (distFromCenter + player.radius > ringRadius) {
-                    // Player is out!
-                    player.alive = false;
+                    // Give player a chance to recover if just touching edge
+                    if (distFromCenter + player.radius > ringRadius + 10) {
+                        player.alive = false;
+                        // Don't end game immediately, let the timer check handle it
+                        console.log(`Player ${player.address.substring(0, 8)} eliminated! ${getAlivePlayers().length - 1} players remaining.`);
+                    } else {
+                        // Push back toward center with strong force
+                        const pushAngle = Math.atan2(player.y - centerY, player.x - centerX);
+                        player.vx -= Math.cos(pushAngle) * 2;
+                        player.vy -= Math.sin(pushAngle) * 2;
+                    }
                 }
                 
                 // Check powerup expiration
@@ -475,21 +541,34 @@
                 }
             }
             
-            // Powerup collisions
-            gameState.powerups.forEach((powerup, index) => {
-                playersArray.forEach(player => {
+            // Powerup collisions - fixing the collection logic
+            for (let i = gameState.powerups.length - 1; i >= 0; i--) {
+                const powerup = gameState.powerups[i];
+                const playersArray = Array.from(gameState.players.values()).filter(p => p.alive);
+                
+                for (let j = 0; j < playersArray.length; j++) {
+                    const player = playersArray[j];
                     const dist = Math.sqrt(Math.pow(player.x - powerup.x, 2) + Math.pow(player.y - powerup.y, 2));
+                    
                     if (dist < player.radius + 15) {
                         // Collect powerup
                         player.powerup = powerup.type;
                         player.powerupEndTime = Date.now() + POWERUP_TYPES[powerup.type].duration;
-                        gameState.powerups.splice(index, 1);
+                        
+                        // Remove from array safely
+                        gameState.powerups.splice(i, 1);
+                        
+                        // Show feedback
+                        if (player.id === gameState.myPlayerId) {
+                            showMessage(`Got ${powerup.type} powerup!`);
+                        }
+                        break; // Exit inner loop once powerup is collected
                     }
-                });
-            });
+                }
+            }
             
             // Spawn powerups randomly
-            if (Math.random() < 0.01) {
+            if (Math.random() < 0.01 && gameState.gamePhase === 'playing') {
                 spawnPowerup();
             }
         }
@@ -526,45 +605,56 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist < p1.radius + p2.radius) {
-                // Collision!
-                const force1 = (p1.powerup === 'STRENGTH' ? 1.5 : 1) * p1.bet * 100;
-                const force2 = (p2.powerup === 'STRENGTH' ? 1.5 : 1) * p2.bet * 100;
+                // Enhanced collision with better physics
+                const mass1 = p1.radius * p1.radius; // Mass based on area
+                const mass2 = p2.radius * p2.radius;
+                
+                // Strength multipliers
+                const strength1 = (p1.powerup === 'STRENGTH' ? 2.0 : 1.0) * p1.bet * 150; // Increased from 100
+                const strength2 = (p2.powerup === 'STRENGTH' ? 2.0 : 1.0) * p2.bet * 150;
+                
+                // Velocity-based momentum (players moving faster hit harder)
+                const velocity1 = Math.sqrt(p1.vx * p1.vx + p1.vy * p1.vy);
+                const velocity2 = Math.sqrt(p2.vx * p2.vx + p2.vy * p2.vy);
+                const momentumFactor1 = 1 + velocity1 * 0.5;
+                const momentumFactor2 = 1 + velocity2 * 0.5;
                 
                 // Normalize collision vector
                 const nx = dx / dist;
                 const ny = dy / dist;
                 
-                // Apply forces
-                const totalForce = force1 + force2;
-                p1.vx += nx * (force2 / totalForce) * 2;
-                p1.vy += ny * (force2 / totalForce) * 2;
-                p2.vx -= nx * (force1 / totalForce) * 2;
-                p2.vy -= ny * (force1 / totalForce) * 2;
+                // Calculate impact forces with momentum
+                const force1 = strength1 * momentumFactor1;
+                const force2 = strength2 * momentumFactor2;
                 
-                // Separate players
-                const overlap = (p1.radius + p2.radius) - dist;
-                p1.x += nx * overlap * 0.5;
-                p1.y += ny * overlap * 0.5;
-                p2.x -= nx * overlap * 0.5;
-                p2.y -= ny * overlap * 0.5;
+                // Apply forces with mass consideration
+                const pushForce = 3.5; // Increased from 2
+                p1.vx += nx * (force2 / mass1) * pushForce;
+                p1.vy += ny * (force2 / mass1) * pushForce;
+                p2.vx -= nx * (force1 / mass2) * pushForce;
+                p2.vy -= ny * (force1 / mass2) * pushForce;
+                
+                // Separate players more aggressively
+                const overlap = (p1.radius + p2.radius) - dist + 2; // Added +2 for better separation
+                const separationForce = overlap * 0.6; // Increased from 0.5
+                p1.x += nx * separationForce * (mass2 / (mass1 + mass2));
+                p1.y += ny * separationForce * (mass2 / (mass1 + mass2));
+                p2.x -= nx * separationForce * (mass1 / (mass1 + mass2));
+                p2.y -= ny * separationForce * (mass1 / (mass1 + mass2));
+                
+                // Add screen shake effect for impact feedback
+                if (p1.id === gameState.myPlayerId || p2.id === gameState.myPlayerId) {
+                    shakeScreen();
+                }
             }
         }
 
-        function spawnPowerup() {
-            if (gameState.powerups.length < 3) {
-                const types = Object.keys(POWERUP_TYPES);
-                const type = types[Math.floor(Math.random() * types.length)];
-                
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * (ringRadius - 50);
-                
-                gameState.powerups.push({
-                    type: type,
-                    x: centerX + Math.cos(angle) * radius,
-                    y: centerY + Math.sin(angle) * radius,
-                    rotation: 0
-                });
-            }
+        // Add screen shake for impact feedback
+        function shakeScreen() {
+            canvas.style.transform = `translate(${Math.random() * 4 - 2}px, ${Math.random() * 4 - 2}px)`;
+            setTimeout(() => {
+                canvas.style.transform = 'translate(0, 0)';
+            }, 100);
         }
 
         function render() {
@@ -579,13 +669,23 @@
             ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
             ctx.stroke();
             
-            // Draw ring danger zone
-            ctx.strokeStyle = '#ff4444';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, ringRadius - 30, 0, Math.PI * 2);
-            ctx.stroke();
+            // Draw multiple danger zones for better visual feedback
+            const dangerZones = [
+                { radius: ringRadius - 20, color: '#ff6666', alpha: 0.3 },
+                { radius: ringRadius - 40, color: '#ff4444', alpha: 0.2 },
+                { radius: ringRadius - 60, color: '#ff2222', alpha: 0.1 }
+            ];
+            
+            dangerZones.forEach(zone => {
+                ctx.strokeStyle = zone.color;
+                ctx.globalAlpha = zone.alpha;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([8, 4]);
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, zone.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+            ctx.globalAlpha = 1.0;
             ctx.setLineDash([]);
             
             // Draw powerups
@@ -603,28 +703,60 @@
                 ctx.fillText(type.emoji, powerup.x, powerup.y + 7);
             });
             
-            // Draw players
+            // Draw players with enhanced visual feedback
             gameState.players.forEach(player => {
                 if (!player.alive) return;
                 
-                // Player body
+                // Show velocity trails for moving players
+                const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+                if (speed > 0.5) {
+                    ctx.strokeStyle = player.color;
+                    ctx.globalAlpha = 0.3;
+                    ctx.lineWidth = player.radius / 3;
+                    ctx.beginPath();
+                    ctx.moveTo(player.x, player.y);
+                    ctx.lineTo(player.x - player.vx * 3, player.y - player.vy * 3);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                // Player body with size-based glow effect
+                ctx.shadowColor = player.color;
+                ctx.shadowBlur = player.radius / 3;
                 ctx.fillStyle = player.color;
+                
                 if (player.powerup === 'SHIELD') {
                     ctx.strokeStyle = '#4444ff';
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 4; // Increased from 3
                     ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius + 5, 0, Math.PI * 2);
+                    ctx.arc(player.x, player.y, player.radius + 8, 0, Math.PI * 2); // Increased from +5
                     ctx.stroke();
                 }
                 
                 ctx.beginPath();
                 ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Show danger indicator when near edge
+                const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
+                if (distFromCenter + player.radius > ringRadius - 50) {
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.radius + 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
                 
                 // Player bet amount
                 ctx.fillStyle = 'white';
-                ctx.font = '12px Arial';
+                ctx.font = 'bold 12px Arial';
                 ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.strokeText(player.bet.toFixed(3), player.x, player.y + 4);
                 ctx.fillText(player.bet.toFixed(3), player.x, player.y + 4);
                 
                 // Powerup indicator
@@ -661,7 +793,8 @@
             if (gameState.gamePhase === 'countdown') {
                 document.getElementById('gameTimer').textContent = gameState.countdown || 'FIGHT!';
             } else if (gameState.gamePhase === 'playing') {
-                document.getElementById('gameTimer').textContent = `${gameState.gameTime}s`;
+                const alivePlayers = getAlivePlayers();
+                document.getElementById('gameTimer').textContent = `${gameState.gameTime}s (${alivePlayers.length} alive)`;
             } else {
                 document.getElementById('gameTimer').textContent = 'Waiting...';
             }
@@ -672,6 +805,7 @@
             gameState.players.forEach(player => {
                 const card = document.createElement('div');
                 card.className = 'player-card';
+                card.style.opacity = player.alive ? '1.0' : '0.5'; // Dim eliminated players
                 card.innerHTML = `
                     <div style="color: ${player.color}">●</div>
                     <div>${player.address.substring(0, 6)}...</div>
@@ -688,6 +822,50 @@
 
         // Update UI periodically
         setInterval(updateUI, 100);
+
+        function spawnPowerup() {
+            if (gameState.powerups.length < 3) {
+                const types = Object.keys(POWERUP_TYPES);
+                const type = types[Math.floor(Math.random() * types.length)];
+                
+                // Spawn inside the ring but not too close to center
+                const angle = Math.random() * Math.PI * 2;
+                const minRadius = ringRadius * 0.2; // Minimum distance from center
+                const maxRadius = ringRadius * 0.7; // Not too close to edge
+                const distance = minRadius + Math.random() * (maxRadius - minRadius);
+                
+                gameState.powerups.push({
+                    type: type,
+                    x: centerX + Math.cos(angle) * distance,
+                    y: centerY + Math.sin(angle) * distance,
+                    rotation: 0
+                });
+            }
+        }
+
+        // Add a simple message display function
+        function showMessage(text, duration = 2000) {
+            const message = document.createElement('div');
+            message.style.position = 'absolute';
+            message.style.top = '20px';
+            message.style.left = '50%';
+            message.style.transform = 'translateX(-50%)';
+            message.style.background = 'rgba(0,0,0,0.7)';
+            message.style.color = 'white';
+            message.style.padding = '10px 20px';
+            message.style.borderRadius = '20px';
+            message.style.fontWeight = 'bold';
+            message.style.zIndex = '1000';
+            message.textContent = text;
+            
+            document.body.appendChild(message);
+            
+            setTimeout(() => {
+                message.style.opacity = '0';
+                message.style.transition = 'opacity 0.5s';
+                setTimeout(() => document.body.removeChild(message), 500);
+            }, duration);
+        }
     </script>
 </body>
 </html>
