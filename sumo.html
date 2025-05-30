@@ -241,15 +241,8 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log("DOM completamente cargado y parseado.");
-            if (typeof ethers !== 'undefined') {
-                console.log("Ethers.js está disponible.");
-                setupEthers(); // Intentar configuración temprana
-            } else {
-                console.error("Ethers.js NO está disponible en DOMContentLoaded. Verifica el script CDN.");
-            }
-
             loadSumoImages();
+            setupEthers();
             setupEventListeners();
             gameLoop();
             
@@ -287,22 +280,17 @@
 
         // Configuración de ethers.js para interactuar con Ethereum
         function setupEthers() {
-            // Esta función es un intento de configuración temprana.
-            // connectWallet se asegurará de que el provider esté listo si este intento falla.
-            if (typeof ethers === 'undefined') {
-                console.warn("Ethers.js no está definido durante setupEthers. Se intentará de nuevo al conectar.");
-                return;
-            }
             try {
+                // Verificar si MetaMask está instalado
                 if (window.ethereum) {
+                    // Crear provider usando el proveedor de la ventana (MetaMask) - Sintaxis Ethers v6
                     provider = new ethers.BrowserProvider(window.ethereum);
-                    console.log("Ethers.js provider inicializado tempranamente en setupEthers.");
+                    console.log("Ethers.js initialized with BrowserProvider (v6)");
                 } else {
-                    // No es un error fatal aquí, window.ethereum podría aparecer más tarde.
-                    console.log("window.ethereum AÚN no detectado en setupEthers. Se verificará de nuevo al conectar.");
+                    console.log("No Ethereum wallet detected"); // Este mensaje es correcto si no hay wallet
                 }
             } catch (error) {
-                console.error("Error durante el intento temprano de setupEthers:", error);
+                console.error("Error setting up ethers:", error);
             }
         }
 
@@ -318,97 +306,118 @@
 
         // Wallet functions con ethers.js
         async function connectWallet() {
-            console.log("Intentando conectar wallet...");
-            // Log CRÍTICO: ¿Qué es window.ethereum AHORA MISMO (al hacer clic)?
-            console.log("Estado de window.ethereum al inicio de connectWallet:", window.ethereum); 
-
-            if (typeof ethers === 'undefined') {
-                alert("Ethers.js no está cargado. Por favor, recarga la página o revisa la consola.");
-                console.error("Ethers.js no definido al intentar conectar wallet.");
-                return;
-            }
-
             try {
                 if (!window.ethereum) {
-                    alert("MetaMask u otra wallet Ethereum no encontrada. Por favor, instala MetaMask, asegúrate de que esté activa para este sitio y recarga la página.");
-                    console.log("window.ethereum NO encontrado al hacer clic en conectar wallet.");
-                    simulateWalletConnection(); 
+                    alert("MetaMask or other Ethereum wallet not found! Please install MetaMask.");
+                    simulateWalletConnection();
                     return;
                 }
                 
-                // Asegurar que el provider esté inicializado
-                if (!provider) {
-                    console.log("Provider no estaba inicializado, intentando ahora en connectWallet.");
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                }
-                
-                // Solicitar cuentas al usuario (esto también activa la conexión si no está conectado)
-                const accounts = await provider.send("eth_requestAccounts", []);
-                
+                // En Ethers v6, el signer se obtiene después de conectar.
+                // Primero, solicitar cuentas para asegurar la conexión.
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 if (!accounts || accounts.length === 0) {
-                    alert("No se encontraron cuentas o se denegó el permiso.");
+                    alert("No accounts found or permission denied.");
                     simulateWalletConnection();
                     return;
                 }
 
+                // Crear provider si no existe (puede pasar si setupEthers falló o no se llamó)
+                if (!provider) {
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                }
+                
+                // Obtener el signer (la cuenta conectada) - Sintaxis Ethers v6
                 signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
                 walletConnected = true;
                 
-                document.getElementById('walletAddress').textContent = `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`;
+                // Actualizar UI
+                document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
                 document.getElementById('connectWallet').textContent = 'Connected ✓';
                 document.getElementById('connectWallet').disabled = true;
                 
+                // Configurar eventos para cambios en la wallet
                 setupWalletEvents();
                 
+                // Obtener saldo
                 const balance = await provider.getBalance(walletAddress);
+                // Sintaxis Ethers v6 para formatear Ether
                 const etherBalance = ethers.formatEther(balance);
                 
-                console.log("Wallet conectada:", walletAddress);
+                console.log("Wallet connected:", walletAddress);
                 console.log("Balance:", etherBalance, "ETH");
-                showMessage(`Wallet conectada: ${etherBalance} ETH`);
-
+                
+                showMessage(`Wallet connected: ${etherBalance} ETH`);
             } catch (error) {
-                console.error("Error conectando la wallet:", error);
-                alert(`Error al conectar la wallet: ${error.message || 'Error desconocido. Revisa la consola.'}`);
-                // Si falla la conexión real, permitir simulación para no bloquear pruebas
+                console.error("Error connecting wallet:", error);
+                alert(`Error connecting wallet: ${error.message || error}`);
                 simulateWalletConnection();
             }
         }
         
         // Configurar eventos de la wallet
         function setupWalletEvents() {
-            if (!window.ethereum) {
-                console.log("No window.ethereum para configurar eventos de wallet.");
-                return;
+            if (!window.ethereum) return;
+            
+            // Remover listeners anteriores para evitar duplicados
+            try {
+                window.ethereum.removeAllListeners('accountsChanged');
+                window.ethereum.removeAllListeners('chainChanged');
+            } catch (error) {
+                console.log('No previous listeners to remove');
             }
             
-            window.ethereum.on('accountsChanged', async (accounts) => {
-                console.log('Evento accountsChanged detectado:', accounts);
+            // Usar addEventListener en lugar de .on() para mejor compatibilidad
+            const handleAccountsChanged = async (accounts) => {
+                console.log('Accounts changed:', accounts);
                 if (accounts.length === 0) {
+                    // Usuario desconectó su wallet
                     walletConnected = false;
                     walletAddress = '';
                     signer = null;
                     document.getElementById('walletAddress').textContent = 'Not Connected';
                     document.getElementById('connectWallet').textContent = 'Connect Wallet';
                     document.getElementById('connectWallet').disabled = false;
-                    showMessage("Wallet desconectada.");
+                    showMessage('Wallet disconnected');
                 } else {
-                    walletAddress = accounts[0];
-                    document.getElementById('walletAddress').textContent = `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`;
-                    if (provider) {
-                        signer = await provider.getSigner();
-                        const balance = await provider.getBalance(walletAddress);
-                        showMessage(`Cuenta cambiada: ${ethers.formatEther(balance)} ETH`);
+                    // Usuario cambió de cuenta
+                    try {
+                        walletAddress = accounts[0];
+                        document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
+                        if (provider) {
+                            signer = await provider.getSigner();
+                        }
+                        showMessage('Account changed');
+                    } catch (error) {
+                        console.error('Error handling account change:', error);
                     }
                 }
-            });
+            };
             
-            window.ethereum.on('chainChanged', (chainId) => {
-                console.log('Evento chainChanged detectado, nueva chainId:', chainId);
-                showMessage("Red cambiada. Recargando página...");
-                window.location.reload();
-            });
+            const handleChainChanged = (chainId) => {
+                console.log('Chain changed to:', chainId);
+                showMessage('Network changed - reloading...', 1000);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            };
+            
+            // Usar try-catch para manejar diferentes versiones de MetaMask
+            try {
+                if (window.ethereum.on) {
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                    window.ethereum.on('chainChanged', handleChainChanged);
+                } else if (window.ethereum.addEventListener) {
+                    window.ethereum.addEventListener('accountsChanged', handleAccountsChanged);
+                    window.ethereum.addEventListener('chainChanged', handleChainChanged);
+                } else {
+                    console.log('MetaMask event listeners not supported');
+                }
+            } catch (error) {
+                console.error('Error setting up wallet events:', error);
+                // Continuar sin event listeners si hay problemas
+            }
         }
 
         // Game functions - Modificar joinGame para usar ethers.js
@@ -484,7 +493,6 @@
         
         // Simular unirse al juego (para demo)
         function simulateJoinGame(betAmount) {
-            console.log("Simulando unirse al juego con apuesta:", betAmount);
             document.getElementById('joinGame').disabled = true;
             document.getElementById('joinGame').textContent = 'Processing...';
             
@@ -529,7 +537,6 @@
 
         // Función simulación sigue siendo útil para pruebas
         function simulateWalletConnection() {
-            console.log("Simulando conexión de wallet.");
             walletAddress = '0x' + Math.random().toString(16).substring(2, 42);
             walletConnected = true;
             document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
