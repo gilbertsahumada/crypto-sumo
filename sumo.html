@@ -241,8 +241,15 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM completamente cargado y parseado.");
+            if (typeof ethers !== 'undefined') {
+                console.log("Ethers.js está disponible.");
+                setupEthers(); // Intentar configuración temprana
+            } else {
+                console.error("Ethers.js NO está disponible en DOMContentLoaded. Verifica el script CDN.");
+            }
+
             loadSumoImages();
-            setupEthers();
             setupEventListeners();
             gameLoop();
             
@@ -280,17 +287,22 @@
 
         // Configuración de ethers.js para interactuar con Ethereum
         function setupEthers() {
+            // Esta función es un intento de configuración temprana.
+            // connectWallet se asegurará de que el provider esté listo si este intento falla.
+            if (typeof ethers === 'undefined') {
+                console.warn("Ethers.js no está definido durante setupEthers. Se intentará de nuevo al conectar.");
+                return;
+            }
             try {
-                // Verificar si MetaMask está instalado
                 if (window.ethereum) {
-                    // Crear provider usando el proveedor de la ventana (MetaMask)
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-                    console.log("Ethers.js initialized with Web3Provider");
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    console.log("Ethers.js provider inicializado tempranamente en setupEthers.");
                 } else {
-                    console.log("No Ethereum wallet detected");
+                    // No es un error fatal aquí, window.ethereum podría aparecer más tarde.
+                    console.log("window.ethereum AÚN no detectado en setupEthers. Se verificará de nuevo al conectar.");
                 }
             } catch (error) {
-                console.error("Error setting up ethers:", error);
+                console.error("Error durante el intento temprano de setupEthers:", error);
             }
         }
 
@@ -306,65 +318,95 @@
 
         // Wallet functions con ethers.js
         async function connectWallet() {
+            console.log("Intentando conectar wallet...");
+            // Log CRÍTICO: ¿Qué es window.ethereum AHORA MISMO (al hacer clic)?
+            console.log("Estado de window.ethereum al inicio de connectWallet:", window.ethereum); 
+
+            if (typeof ethers === 'undefined') {
+                alert("Ethers.js no está cargado. Por favor, recarga la página o revisa la consola.");
+                console.error("Ethers.js no definido al intentar conectar wallet.");
+                return;
+            }
+
             try {
                 if (!window.ethereum) {
-                    alert("MetaMask or other Ethereum wallet not found! Please install MetaMask.");
-                    simulateWalletConnection();
+                    alert("MetaMask u otra wallet Ethereum no encontrada. Por favor, instala MetaMask, asegúrate de que esté activa para este sitio y recarga la página.");
+                    console.log("window.ethereum NO encontrado al hacer clic en conectar wallet.");
+                    simulateWalletConnection(); 
                     return;
                 }
                 
-                // Solicitar acceso a la cuenta
-                await provider.send("eth_requestAccounts", []);
+                // Asegurar que el provider esté inicializado
+                if (!provider) {
+                    console.log("Provider no estaba inicializado, intentando ahora en connectWallet.");
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                }
                 
-                // Obtener el signer (la cuenta conectada)
-                signer = provider.getSigner();
+                // Solicitar cuentas al usuario (esto también activa la conexión si no está conectado)
+                const accounts = await provider.send("eth_requestAccounts", []);
+                
+                if (!accounts || accounts.length === 0) {
+                    alert("No se encontraron cuentas o se denegó el permiso.");
+                    simulateWalletConnection();
+                    return;
+                }
+
+                signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
                 walletConnected = true;
                 
-                // Actualizar UI
-                document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
+                document.getElementById('walletAddress').textContent = `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`;
                 document.getElementById('connectWallet').textContent = 'Connected ✓';
                 document.getElementById('connectWallet').disabled = true;
                 
-                // Configurar eventos para cambios en la wallet
                 setupWalletEvents();
                 
-                // Obtener saldo
                 const balance = await provider.getBalance(walletAddress);
-                const etherBalance = ethers.utils.formatEther(balance);
+                const etherBalance = ethers.formatEther(balance);
                 
-                console.log("Wallet connected:", walletAddress);
+                console.log("Wallet conectada:", walletAddress);
                 console.log("Balance:", etherBalance, "ETH");
-                
-                showMessage(`Wallet connected: ${etherBalance} ETH`);
+                showMessage(`Wallet conectada: ${etherBalance} ETH`);
+
             } catch (error) {
-                console.error("Error connecting wallet:", error);
+                console.error("Error conectando la wallet:", error);
+                alert(`Error al conectar la wallet: ${error.message || 'Error desconocido. Revisa la consola.'}`);
+                // Si falla la conexión real, permitir simulación para no bloquear pruebas
                 simulateWalletConnection();
             }
         }
         
         // Configurar eventos de la wallet
         function setupWalletEvents() {
-            if (!window.ethereum) return;
+            if (!window.ethereum) {
+                console.log("No window.ethereum para configurar eventos de wallet.");
+                return;
+            }
             
             window.ethereum.on('accountsChanged', async (accounts) => {
+                console.log('Evento accountsChanged detectado:', accounts);
                 if (accounts.length === 0) {
-                    // Usuario desconectó su wallet
                     walletConnected = false;
                     walletAddress = '';
+                    signer = null;
                     document.getElementById('walletAddress').textContent = 'Not Connected';
                     document.getElementById('connectWallet').textContent = 'Connect Wallet';
                     document.getElementById('connectWallet').disabled = false;
+                    showMessage("Wallet desconectada.");
                 } else {
-                    // Usuario cambió de cuenta
                     walletAddress = accounts[0];
-                    document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
-                    signer = provider.getSigner();
+                    document.getElementById('walletAddress').textContent = `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`;
+                    if (provider) {
+                        signer = await provider.getSigner();
+                        const balance = await provider.getBalance(walletAddress);
+                        showMessage(`Cuenta cambiada: ${ethers.formatEther(balance)} ETH`);
+                    }
                 }
             });
             
-            window.ethereum.on('chainChanged', () => {
-                // Actualizar cuando el usuario cambia de red
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log('Evento chainChanged detectado, nueva chainId:', chainId);
+                showMessage("Red cambiada. Recargando página...");
                 window.location.reload();
             });
         }
@@ -382,7 +424,7 @@
                 return;
             }
             
-            // Si estamos en modo demo (sin wallet real), simular la transacción
+            // Si estamos en modo demo (sin wallet real o signer), simular la transacción
             if (!signer) {
                 simulateJoinGame(betAmount);
                 return;
@@ -395,11 +437,12 @@
                 
                 // Obtener saldo para verificar
                 const balance = await provider.getBalance(walletAddress);
-                const betAmountWei = ethers.utils.parseEther(betAmount.toString());
+                // Sintaxis Ethers v6 para parsear Ether
+                const betAmountWei = ethers.parseEther(betAmount.toString());
                 
                 // Verificar que tiene suficiente saldo
-                if (balance.lt(betAmountWei)) {
-                    alert(`Insufficient balance. You have ${ethers.utils.formatEther(balance)} ETH.`);
+                if (balance < betAmountWei) { // .lt() no es necesario para BigInts en v6, se pueden usar operadores <, >
+                    alert(`Insufficient balance. You have ${ethers.formatEther(balance)} ETH.`);
                     document.getElementById('joinGame').disabled = false;
                     document.getElementById('joinGame').textContent = 'Join Game (Bet ETH)';
                     return;
@@ -441,6 +484,7 @@
         
         // Simular unirse al juego (para demo)
         function simulateJoinGame(betAmount) {
+            console.log("Simulando unirse al juego con apuesta:", betAmount);
             document.getElementById('joinGame').disabled = true;
             document.getElementById('joinGame').textContent = 'Processing...';
             
@@ -485,6 +529,7 @@
 
         // Función simulación sigue siendo útil para pruebas
         function simulateWalletConnection() {
+            console.log("Simulando conexión de wallet.");
             walletAddress = '0x' + Math.random().toString(16).substring(2, 42);
             walletConnected = true;
             document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
