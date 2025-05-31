@@ -154,6 +154,8 @@
     </style>
     <!-- Reemplazar Viem con ethers.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js" type="application/javascript"></script>
+    <!-- Import contract ABI -->
+    <script src="./js/sumoContract.js"></script>
 </head>
 <body>
     <div class="game-container">
@@ -163,19 +165,23 @@
             <div class="wallet-info">
                 <h3>💰 Wallet</h3>
                 <p id="walletAddress">Not Connected</p>
-                <button class="btn" id="connectWallet">Connect Wallet</button>
+                <div class="wallet-buttons">
+                    <button class="btn" id="connectWallet">Connect Wallet</button>
+                    <button class="btn" id="disconnectWallet" style="display:none; background: linear-gradient(45deg, #ff6b6b, #ff8e8e);">Disconnect</button>
+                </div>
+                <p id="networkStatus" style="font-size: 12px; margin-top: 5px;"></p>
             </div>
             <div class="game-stats">
                 <h3>🏆 Game Stats</h3>
-                <p>Prize Pool: <span id="prizePool">0</span> ETH</p>
+                <p>Prize Pool: <span id="prizePool">0</span> FLOW</p>
                 <p>Players: <span id="playerCount">0</span></p>
                 <p class="countdown" id="gameTimer"></p>
             </div>
         </div>
         
         <div class="controls">
-            <input type="number" id="betAmount" placeholder="Bet Amount (ETH)" step="0.001" min="0.001" value="0.01">
-            <button class="btn" id="joinGame">Join Game (Bet ETH)</button>
+            <input type="number" id="betAmount" placeholder="Bet Amount (FLOW)" step="0.001" min="0.001" value="0.01">
+            <button class="btn" id="joinGame">Join Game (Bet FLOW)</button>
             <button class="btn" id="startGame" style="display:none;">Start Game</button>
         </div>
         
@@ -196,6 +202,19 @@
     </div>
 
     <script>
+        // Flow Testnet Network Configuration
+        const FLOW_TESTNET = {
+            chainId: '0x221', // 545 in decimal
+            chainName: 'Flow Testnet',
+            rpcUrls: ['https://testnet.evm.nodes.onflow.org'],
+            nativeCurrency: {
+                name: 'FLOW',
+                symbol: 'FLOW',
+                decimals: 18
+            },
+            blockExplorerUrls: ['https://testnet.flowscan.org']
+        };
+
         // Game State
         let gameState = {
             players: new Map(),
@@ -296,6 +315,7 @@
 
         function setupEventListeners() {
             document.getElementById('connectWallet').addEventListener('click', connectWallet);
+            document.getElementById('disconnectWallet').addEventListener('click', disconnectWallet);
             document.getElementById('joinGame').addEventListener('click', joinGame);
             document.getElementById('startGame').addEventListener('click', startGame);
             
@@ -313,50 +333,197 @@
                     return;
                 }
                 
-                // En Ethers v6, el signer se obtiene después de conectar.
-                // Primero, solicitar cuentas para asegurar la conexión.
+                // Request accounts first to ensure we're connected
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 if (!accounts || accounts.length === 0) {
                     alert("No accounts found or permission denied.");
                     simulateWalletConnection();
                     return;
                 }
+                
+                // Show network status in UI
+                document.getElementById('networkStatus').textContent = "Checking network...";
+                
+                // Check if we're on the correct network
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                if (chainId !== FLOW_TESTNET.chainId) {
+                    // Wrong network, prompt to switch
+                    document.getElementById('networkStatus').textContent = "Switching to Flow Testnet...";
+                    showMessage("Attempting to switch to Flow Testnet...");
+                    
+                    try {
+                        const switched = await switchToFlowTestnet();
+                        if (!switched) {
+                            document.getElementById('networkStatus').textContent = "Please add Flow network manually";
+                            showManualNetworkInstructions();
+                            return;
+                        }
+                    } catch (switchError) {
+                        console.error("Switch error:", switchError);
+                        document.getElementById('networkStatus').textContent = "Network switch failed";
+                        showManualNetworkInstructions();
+                        return;
+                    }
+                }
 
-                // Crear provider si no existe (puede pasar si setupEthers falló o no se llamó)
+                // Crear provider si no existe
                 if (!provider) {
                     provider = new ethers.BrowserProvider(window.ethereum);
                 }
                 
-                // Obtener el signer (la cuenta conectada) - Sintaxis Ethers v6
+                // Obtener el signer
                 signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
                 walletConnected = true;
                 
                 // Actualizar UI
                 document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
-                document.getElementById('connectWallet').textContent = 'Connected ✓';
-                document.getElementById('connectWallet').disabled = true;
+                document.getElementById('connectWallet').style.display = 'none';
+                document.getElementById('disconnectWallet').style.display = 'inline-block';
+                document.getElementById('networkStatus').textContent = "Connected to Flow Testnet";
                 
                 // Configurar eventos para cambios en la wallet
                 setupWalletEvents();
                 
                 // Obtener saldo
                 const balance = await provider.getBalance(walletAddress);
-                // Sintaxis Ethers v6 para formatear Ether
                 const etherBalance = ethers.formatEther(balance);
                 
                 console.log("Wallet connected:", walletAddress);
-                console.log("Balance:", etherBalance, "ETH");
+                console.log("Balance:", etherBalance, "FLOW");
                 
-                showMessage(`Wallet connected: ${etherBalance} ETH`);
+                showMessage(`Wallet connected: ${etherBalance} FLOW`);
             } catch (error) {
                 console.error("Error connecting wallet:", error);
                 alert(`Error connecting wallet: ${error.message || error}`);
+                document.getElementById('networkStatus').textContent = "Connection failed";
                 simulateWalletConnection();
             }
         }
         
-        // Configurar eventos de la wallet
+        // Function to disconnect wallet
+        async function disconnectWallet() {
+            try {
+                // Reset wallet state
+                walletConnected = false;
+                walletAddress = '';
+                signer = null;
+                
+                // Update UI
+                document.getElementById('walletAddress').textContent = 'Not Connected';
+                document.getElementById('connectWallet').style.display = 'inline-block';
+                document.getElementById('disconnectWallet').style.display = 'none';
+                document.getElementById('networkStatus').textContent = '';
+                document.getElementById('joinGame').disabled = false;
+                document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                
+                // Note: MetaMask doesn't have a direct disconnect method from dApps
+                // We're just resetting our app's connection state
+                
+                showMessage('Wallet disconnected');
+                
+                // If player is in game, we may want to handle that
+                if (gameState.myPlayerId) {
+                    // This would depend on your game logic
+                    // Possibly remove player or mark as disconnected
+                }
+                
+            } catch (error) {
+                console.error("Error disconnecting wallet:", error);
+                showMessage('Error disconnecting wallet');
+            }
+        }
+        
+        // Function to display manual network adding instructions
+        function showManualNetworkInstructions() {
+            const instructions = document.createElement('div');
+            instructions.style.position = 'fixed';
+            instructions.style.top = '50%';
+            instructions.style.left = '50%';
+            instructions.style.transform = 'translate(-50%, -50%)';
+            instructions.style.background = 'rgba(0,0,0,0.9)';
+            instructions.style.color = 'white';
+            instructions.style.padding = '20px';
+            instructions.style.borderRadius = '10px';
+            instructions.style.maxWidth = '400px';
+            instructions.style.zIndex = '1001';
+            instructions.innerHTML = `
+                <h3 style="color: #FFD700;">Add Flow Network Manually</h3>
+                <p>Please add Flow Testnet to your wallet with these details:</p>
+                <ul style="text-align: left; margin: 15px 0;">
+                    <li>Network Name: Flow Testnet</li>
+                    <li>RPC URL: https://testnet.evm.nodes.onflow.org</li>
+                    <li>Chain ID: 545 (0x221)</li>
+                    <li>Currency Symbol: FLOW</li>
+                    <li>Block Explorer: https://testnet.flowscan.org</li>
+                </ul>
+                <button id="closeInstructions" class="btn" style="margin-top: 10px;">Close</button>
+                <button id="tryAgain" class="btn" style="margin-top: 10px; margin-left: 10px;">Try Again</button>
+            `;
+            
+            document.body.appendChild(instructions);
+            
+            document.getElementById('closeInstructions').addEventListener('click', () => {
+                document.body.removeChild(instructions);
+            });
+            
+            document.getElementById('tryAgain').addEventListener('click', () => {
+                document.body.removeChild(instructions);
+                connectWallet();
+            });
+        }
+        
+        // Function to switch to Flow Testnet with improved error handling
+        async function switchToFlowTestnet() {
+            try {
+                console.log("Attempting to switch to Flow Testnet, chainId:", FLOW_TESTNET.chainId);
+                
+                // First try to switch to the network
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: FLOW_TESTNET.chainId }],
+                });
+                console.log("Network switch successful");
+                return true;
+            } catch (switchError) {
+                console.log("Switch error:", switchError);
+                console.log("Switch error code:", switchError.code);
+                
+                // This error code indicates that the chain has not been added to MetaMask
+                if (switchError.code === 4902 || switchError.message.includes("wallet_addEthereumChain")) {
+                    try {
+                        console.log("Attempting to add Flow Testnet to wallet");
+                        // Add the network to MetaMask
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [
+                                {
+                                    chainId: FLOW_TESTNET.chainId,
+                                    chainName: FLOW_TESTNET.chainName,
+                                    nativeCurrency: FLOW_TESTNET.nativeCurrency,
+                                    rpcUrls: FLOW_TESTNET.rpcUrls,
+                                    blockExplorerUrls: FLOW_TESTNET.blockExplorerUrls
+                                }
+                            ],
+                        });
+                        
+                        // Verify the switch was successful
+                        const newChainId = await window.ethereum.request({ method: 'eth_chainId' });
+                        console.log("New chain ID after add:", newChainId);
+                        return newChainId === FLOW_TESTNET.chainId;
+                        
+                    } catch (addError) {
+                        console.error('Error adding Flow Testnet to wallet:', addError);
+                        return false;
+                    }
+                }
+                // Other errors
+                console.error('Error switching to Flow Testnet:', switchError);
+                return false;
+            }
+        }
+        
+        // Modificar setupWalletEvents para verificar la red en cambios de cadena
         function setupWalletEvents() {
             if (!window.ethereum) return;
             
@@ -368,18 +535,11 @@
                 console.log('No previous listeners to remove');
             }
             
-            // Usar addEventListener en lugar de .on() para mejor compatibilidad
             const handleAccountsChanged = async (accounts) => {
                 console.log('Accounts changed:', accounts);
                 if (accounts.length === 0) {
-                    // Usuario desconectó su wallet
-                    walletConnected = false;
-                    walletAddress = '';
-                    signer = null;
-                    document.getElementById('walletAddress').textContent = 'Not Connected';
-                    document.getElementById('connectWallet').textContent = 'Connect Wallet';
-                    document.getElementById('connectWallet').disabled = false;
-                    showMessage('Wallet disconnected');
+                    // Usuario desconectó su wallet desde MetaMask
+                    disconnectWallet(); // Use our disconnect function
                 } else {
                     // Usuario cambió de cuenta
                     try {
@@ -395,12 +555,33 @@
                 }
             };
             
-            const handleChainChanged = (chainId) => {
+            const handleChainChanged = async (chainId) => {
                 console.log('Chain changed to:', chainId);
-                showMessage('Network changed - reloading...', 1000);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                
+                // Check if new chain is Flow Testnet
+                if (chainId !== FLOW_TESTNET.chainId) {
+                    document.getElementById('networkStatus').textContent = "Wrong network";
+                    showMessage('Wrong network! Please switch to Flow Testnet', 5000);
+                    document.getElementById('joinGame').disabled = true;
+                    
+                    // Add option to switch back
+                    const switchButton = document.createElement('button');
+                    switchButton.className = 'btn';
+                    switchButton.textContent = 'Switch to Flow Testnet';
+                    switchButton.style.margin = '10px auto';
+                    switchButton.style.display = 'block';
+                    
+                    switchButton.onclick = async () => {
+                        await switchToFlowTestnet();
+                        document.body.removeChild(switchButton);
+                    };
+                    
+                    document.body.appendChild(switchButton);
+                } else {
+                    document.getElementById('networkStatus').textContent = "Connected to Flow Testnet";
+                    document.getElementById('joinGame').disabled = false;
+                    showMessage('Connected to Flow Testnet ✓');
+                }
             };
             
             // Usar try-catch para manejar diferentes versiones de MetaMask
@@ -427,67 +608,121 @@
                 return;
             }
 
-            const betAmount = parseFloat(document.getElementById('betAmount').value);
-            if (betAmount < 0.001) {
-                alert('Minimum bet is 0.001 ETH');
-                return;
-            }
-            
-            // Si estamos en modo demo (sin wallet real o signer), simular la transacción
-            if (!signer) {
-                simulateJoinGame(betAmount);
-                return;
-            }
-
             try {
+                // Verificar red correcta
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                if (chainId !== FLOW_TESTNET.chainId) {
+                    alert('Please switch to Flow Testnet to play!');
+                    const switched = await switchToFlowTestnet();
+                    if (!switched) {
+                        showManualNetworkInstructions();
+                        return;
+                    }
+                }
+
+                const betAmount = parseFloat(document.getElementById('betAmount').value);
+                if (betAmount < 0.001) {
+                    alert('Minimum bet is 0.001 FLOW');
+                    return;
+                }
+                
+                // Si estamos en modo demo (sin wallet real o signer), simular la transacción
+                if (!signer) {
+                    simulateJoinGame(betAmount);
+                    return;
+                }
+
                 // Mostrar que estamos procesando
                 document.getElementById('joinGame').disabled = true;
                 document.getElementById('joinGame').textContent = 'Processing...';
                 
                 // Obtener saldo para verificar
                 const balance = await provider.getBalance(walletAddress);
-                // Sintaxis Ethers v6 para parsear Ether
                 const betAmountWei = ethers.parseEther(betAmount.toString());
                 
                 // Verificar que tiene suficiente saldo
-                if (balance < betAmountWei) { // .lt() no es necesario para BigInts en v6, se pueden usar operadores <, >
-                    alert(`Insufficient balance. You have ${ethers.formatEther(balance)} ETH.`);
+                if (balance < betAmountWei) {
+                    alert(`Insufficient balance. You have ${ethers.formatEther(balance)} FLOW.`);
                     document.getElementById('joinGame').disabled = false;
-                    document.getElementById('joinGame').textContent = 'Join Game (Bet ETH)';
+                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
                     return;
                 }
                 
-                // En un juego real, aquí enviarías ETH a un contrato inteligente
-                // Por ahora, simulamos una transacción exitosa
+                // CURRENT IMPLEMENTATION: Send FLOW directly to a specified address
+                // Until the contract is deployed, we'll send funds to this address
+                const targetAddress = "0xb322E239E5A32724633A595b8f8657F9cbb307B2";
                 
-                // Simular transacción (en producción, aquí iría el envío real)
-                showMessage(`Processing ${betAmount} ETH bet...`, 1500);
+                try {
+                    showMessage(`Processing ${betAmount} FLOW bet...`, 1500);
+                    
+                    // Send transaction to the specified address
+                    const tx = await signer.sendTransaction({
+                        to: targetAddress,
+                        value: betAmountWei,
+                        gasLimit: 100000
+                    });
+                    
+                    console.log("Transaction sent:", tx.hash);
+                    showMessage(`Transaction pending... Please wait.`);
+                    
+                    // Wait for transaction confirmation
+                    const receipt = await tx.wait();
+                    console.log("Transaction confirmed:", receipt);
+                    
+                    // Create player after successful transaction
+                    createPlayer(betAmount);
+                    showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
+                    document.getElementById('joinGame').textContent = 'Joined ✓';
+                } catch (txError) {
+                    console.error("Transaction error:", txError);
+                    alert(`Transaction failed: ${txError.message}`);
+                    document.getElementById('joinGame').disabled = false;
+                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                }
                 
                 /*
-                // Código para enviar ETH a un contrato (descomentarlo cuando tengas un contrato real)
-                const tx = await signer.sendTransaction({
-                    to: "0xContractAddressHere", // Dirección del contrato del juego
-                    value: betAmountWei,
-                    gasLimit: 100000
-                });
-                
-                // Esperar confirmación
-                await tx.wait();
-                */
-                
-                setTimeout(() => {
-                    // Crear jugador después de la "transacción"
-                    createPlayer(betAmount);
-                    showMessage(`Bet of ${betAmount} ETH confirmed! 🎉`);
+                // UNCOMMENT THIS SECTION WHEN THE CONTRACT IS READY
+                // And comment out the previous direct transfer section
+                try {
+                    // Create contract instance
+                    const sumoContract = new ethers.Contract(
+                        SUMO_CONTRACT_ADDRESS,
+                        SUMO_CONTRACT_ABI,
+                        signer
+                    );
                     
+                    showMessage(`Processing ${betAmount} FLOW bet via smart contract...`, 1500);
+                    
+                    // Call the joinGame function on the contract (it's payable)
+                    const tx = await sumoContract.joinGame({
+                        value: betAmountWei,
+                        gasLimit: 300000  // Adjust gas limit as needed for your contract
+                    });
+                    
+                    console.log("Contract transaction sent:", tx.hash);
+                    showMessage(`Transaction pending... Please wait.`);
+                    
+                    // Wait for transaction confirmation
+                    const receipt = await tx.wait();
+                    console.log("Contract transaction confirmed:", receipt);
+                    
+                    // Create player after successful transaction
+                    createPlayer(betAmount);
+                    showMessage(`Bet of ${betAmount} FLOW confirmed via contract! 🎉`);
                     document.getElementById('joinGame').textContent = 'Joined ✓';
-                }, 2000);
+                } catch (contractError) {
+                    console.error("Contract error:", contractError);
+                    alert(`Contract interaction failed: ${contractError.message}`);
+                    document.getElementById('joinGame').disabled = false;
+                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                }
+                */
                 
             } catch (error) {
                 console.error("Error placing bet:", error);
                 alert(`Error placing bet: ${error.message}`);
                 document.getElementById('joinGame').disabled = false;
-                document.getElementById('joinGame').textContent = 'Join Game (Bet ETH)';
+                document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
             }
         }
         
@@ -500,7 +735,7 @@
                 createPlayer(betAmount);
                 
                 // Mensaje de confirmación
-                showMessage(`Bet of ${betAmount} ETH confirmed! 🎉`);
+                showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
                 document.getElementById('joinGame').textContent = 'Joined ✓';
             }, 1500);
         }
@@ -590,7 +825,7 @@
             if (alivePlayers.length === 1) {
                 const winner = alivePlayers[0];
                 setTimeout(() => {
-                    alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} ETH!`);
+                    alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
                     resetGame();
                 }, 500);
             } else if (alivePlayers.length === 0) {
@@ -1066,7 +1301,7 @@
                 card.innerHTML = `
                     <div style="color: ${player.color}">●</div>
                     <div>${player.address.substring(0, 6)}...</div>
-                    <div>${player.bet.toFixed(3)} ETH</div>
+                    <div>${player.bet.toFixed(3)} FLOW</div>
                     <div>${player.alive ? '🟢' : '💀'}</div>
                 `;
                 playerList.appendChild(card);
