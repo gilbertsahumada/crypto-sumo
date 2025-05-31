@@ -37,9 +37,20 @@
         }
         
         h1 {
-            font-size: 3rem;
-            margin-bottom: 20px;
+            font-size: 2.5rem; /* Adjusted font size */
+            margin-bottom: 15px; /* Adjusted margin */
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            display: flex; /* For aligning logo and text */
+            align-items: center; /* Vertically align logo and text */
+            justify-content: center; /* Center content */
+        }
+
+        h1 img.logo {
+            height: 45px; /* Adjust logo size as needed */
+            margin-right: 10px; /* Space between logo and text */
+        }
+        
+        h1 span.title-text {
             background: linear-gradient(45deg, #FFD700, #FFA500);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -49,18 +60,28 @@
         .game-info {
             display: flex;
             justify-content: space-around; /* Distribuye el espacio */
-            margin-bottom: 20px;
-            padding: 0 10px; 
+            margin-bottom: 15px; /* Adjusted margin */
+            padding: 0 5px;  /* Adjusted padding */
             width: 100%;
         }
         
         .wallet-info, .game-stats {
             background: rgba(255,255,255,0.1);
-            padding: 15px;
+            padding: 10px; /* Adjusted padding */
             border-radius: 10px;
             backdrop-filter: blur(10px);
-            flex-basis: 45%; /* Cada uno toma ~45% del espacio */
-            min-width: 180px; /* Ancho mínimo para evitar que se compriman demasiado */
+            flex-basis: 48%; /* Adjusted flex-basis */
+            min-width: 150px; /* Adjusted min-width */
+        }
+
+        .wallet-info h3, .game-stats h3 {
+            font-size: 1.1rem; /* Smaller heading */
+            margin-bottom: 5px;
+        }
+
+        .wallet-info p, .game-stats p {
+            font-size: 0.85rem; /* Smaller text */
+            margin-bottom: 4px;
         }
         
         #gameCanvas {
@@ -75,21 +96,21 @@
         }
         
         .controls {
-            margin: 20px 0;
+            margin: 15px 0; /* Adjusted margin */
             width: 100%; /* Asegura que los controles usen el ancho completo para centrar su contenido */
         }
         
         .btn {
             background: linear-gradient(45deg, #FFD700, #FFA500);
             border: none;
-            padding: 12px 24px;
+            padding: 10px 20px; /* Adjusted padding */
             margin: 5px;
             border-radius: 25px;
             color: #333;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
-            font-size: 1rem;
+            font-size: 0.9rem; /* Adjusted font size */
         }
         
         .btn:hover {
@@ -103,12 +124,13 @@
         }
         
         input {
-            padding: 10px;
+            padding: 8px; /* Adjusted padding */
             margin: 5px;
             border: none;
             border-radius: 5px;
             background: rgba(255,255,255,0.9);
             color: #333;
+            font-size: 0.9rem; /* Adjusted font size */
         }
         
         .instructions {
@@ -151,6 +173,11 @@
             border-radius: 5px;
             font-weight: bold;
         }
+
+        h1 img.logo {
+            height: 80px; /* Cambiar de 45px a un valor más grande */
+            margin-right: 10px; /* Space between logo and text */
+        }
     </style>
     <!-- Reemplazar Viem con ethers.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js" type="application/javascript"></script>
@@ -160,7 +187,9 @@
 </head>
 <body>
     <div class="game-container">
-        <h1>⚡ CRYPTO SUMO ⚡</h1>
+        <h1>
+            <img src="./public/logo.png" alt="Crypto Sumo Logo" class="logo">
+        </h1>
         
         <div class="game-info">
             <div class="wallet-info">
@@ -181,8 +210,8 @@
         </div>
         
         <div class="controls">
-            <input type="number" id="betAmount" placeholder="Bet Amount (FLOW)" step="0.001" min="0.001" value="0.01">
-            <button class="btn" id="joinGame">Join Game (Bet FLOW)</button>
+            <input type="number" id="betAmount" placeholder="Bet (FLOW)" step="0.001" min="0.001" value="0.01" style="width: 120px;">
+            <button class="btn" id="joinGame">Join Game</button>
             <button class="btn" id="startGame" style="display:none;">Start Game</button>
         </div>
         
@@ -261,10 +290,11 @@
         // Precargar imágenes de sumo
         const sumoImages = {
             default: new Image(),
-            // MODIFICAR: Imágenes específicas de powerups
-            strength: new Image(),
-            speed: new Image(),
-            shield: new Image(),
+            // MODIFICAR: Imágenes específicas de powerups como overlays
+            strengthOverlay: new Image(),
+            speedOverlay: new Image(),
+            shieldOverlay: new Image(),
+            magnetOverlay: new Image(), // Para cuando agregues la imagen
             // Imágenes de personajes únicos
             character1: new Image(),
             character2: new Image(),
@@ -319,13 +349,14 @@
 
         // Cargar imágenes de sumos
         function loadSumoImages() {
-            // MODIFICAR: Cargar imágenes específicas de powerups
+            // MODIFICAR: Cargar imágenes específicas de powerups como overlays
             sumoImages.default.src = './public/sumo-default.png';
-            sumoImages.strength.src = './public/sumo_strength.PNG';
-            sumoImages.speed.src = './public/sumo_speed.PNG';
-            sumoImages.shield.src = './public/sumo_shield.PNG';
+            sumoImages.strengthOverlay.src = './public/sumo_strength.PNG';
+            sumoImages.speedOverlay.src = './public/sumo_speed.PNG';
+            sumoImages.shieldOverlay.src = './public/sumo_shield.PNG';
+            // sumoImages.magnetOverlay.src = './public/sumo_magnet.PNG'; // Descomenta cuando tengas la imagen
             
-            // MODIFICAR: Cargar imágenes de personajes únicos
+            // MANTENER: Cargar imágenes de personajes únicos
             sumoImages.character1.src = './public/sumo_one.PNG';
             sumoImages.character2.src = './public/sumo_two.PNG';
             sumoImages.character3.src = './public/sumo_three.PNG';
@@ -774,7 +805,7 @@
         function calculatePlayerSize(bet) {
             // Tamaño base mínimo
             const minSize = 20;
-            // Tamaño máximo para evitar personajes demasiado grandes
+            // Tamaño máximo para evitar que se compriman demasiado
             const maxSize = 50;
             // Factor de escala: cada 0.01 FLOW añade ~10 unidades de radio
             const scaleFactor = 1000;
@@ -1026,6 +1057,11 @@
         function handleKeyDown(e) {
             // MODIFICAR: Permitir input tanto en juego como en sala de espera
             if (!gameState.gameRunning && gameState.gamePhase !== 'waiting') return;
+
+            // Prevent scrolling with arrow keys
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
             
             keys[e.key.toLowerCase()] = true;
             
@@ -1046,6 +1082,11 @@
         function handleKeyUp(e) {
             // MODIFICAR: Permitir input tanto en juego como en sala de espera
             if (!gameState.gameRunning && gameState.gamePhase !== 'waiting') return;
+
+            // Prevent scrolling with arrow keys (also on keyup for completeness, though keydown is primary)
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
             
             keys[e.key.toLowerCase()] = false;
             
@@ -1436,7 +1477,7 @@
             }, 100);
         }
 
-        // MODIFICAR: Función de renderizado para usar imágenes de powerups
+        // MODIFICAR: Función de renderizado para usar imágenes base + overlays de powerups
         function render() {
             // Clear canvas
             ctx.fillStyle = '#2d3748';
@@ -1483,7 +1524,7 @@
                 ctx.fillText(type.emoji, powerup.x, powerup.y + 7);
             });
             
-            // Draw players with images instead of circles
+            // Draw players with base images + powerup overlays
             gameState.players.forEach(player => {
                 if (!player.alive) return;
                 
@@ -1500,33 +1541,31 @@
                     ctx.globalAlpha = 1.0;
                 }
                 
-                // MODIFICAR: Seleccionar imagen según powerup o personaje base
-                let sumoImage;
-                
-                if (player.powerup) {
-                    // Si tiene powerup, usar la imagen específica del powerup
-                    switch (player.powerup) {
-                        case 'STRENGTH':
-                            sumoImage = sumoImages.strength;
-                            break;
-                        case 'SPEED':
-                            sumoImage = sumoImages.speed;
-                            break;
-                        case 'SHIELD':
-                            sumoImage = sumoImages.shield;
-                            break;
-                        default:
-                            // Para MAGNET o cualquier otro powerup, usar imagen base del personaje
-                            sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
-                    }
-                } else {
-                    // Sin powerup, usar imagen base del personaje
-                    sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
-                }
+                // NUEVO: Siempre usar la imagen base del personaje
+                let baseImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
                 
                 // Asegurar que la imagen existe, si no usar default
-                if (!sumoImage || !sumoImage.complete) {
-                    sumoImage = sumoImages.character1;
+                if (!baseImage || !baseImage.complete) {
+                    baseImage = sumoImages.character1;
+                }
+                
+                // NUEVO: Determinar imagen overlay de powerup si existe
+                let overlayImage = null;
+                if (player.powerup) {
+                    switch (player.powerup) {
+                        case 'STRENGTH':
+                            overlayImage = sumoImages.strengthOverlay;
+                            break;
+                        case 'SPEED':
+                            overlayImage = sumoImages.speedOverlay;
+                            break;
+                        case 'SHIELD':
+                            overlayImage = sumoImages.shieldOverlay;
+                            break;
+                        case 'MAGNET':
+                            overlayImage = sumoImages.magnetOverlay;
+                            break;
+                    }
                 }
                 
                 // MODIFICAR: Efectos visuales mejorados para powerups
@@ -1574,15 +1613,23 @@
                     sizeMultiplier = 2.2 + Math.sin(pulseTime) * 0.1;
                 }
                 
-                // Dibujar la imagen del sumo
+                // NUEVO: Dibujar la imagen base del personaje SIEMPRE
                 const size = player.radius * sizeMultiplier;
-                ctx.drawImage(sumoImage, -size/2, -size/2, size, size);
+                ctx.drawImage(baseImage, -size/2, -size/2, size, size);
+                
+                // NUEVO: Dibujar overlay de powerup si existe y está cargado
+                if (overlayImage && overlayImage.complete) {
+                    // Ajustar opacidad del overlay para efecto de mezcla
+                    ctx.globalAlpha = 0.7;
+                    ctx.drawImage(overlayImage, -size/2, -size/2, size, size);
+                    ctx.globalAlpha = 1.0;
+                }
                 
                 // Restaurar contexto
                 ctx.restore();
                 ctx.shadowBlur = 0;
                 
-                // MODIFICAR: Efectos adicionales para powerups específicos
+                // MANTENER: Efectos adicionales para powerups específicos
                 if (player.powerup === 'SHIELD') {
                     // Dibujar escudo protector animado
                     const shieldTime = Date.now() * 0.003;
@@ -1676,7 +1723,7 @@
                 ctx.strokeText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
                 ctx.fillText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
                 
-                // MODIFICAR: Powerup indicator mejorado
+                // MANTENER: Powerup indicator mejorado
                 if (player.powerup) {
                     const type = POWERUP_TYPES[player.powerup];
                     
@@ -1937,6 +1984,10 @@
             if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
                 document.getElementById('joinGame').disabled = true;
                 document.getElementById('joinGame').textContent = 'Joined ✓';
+            } else {
+                // Ensure join game button is enabled and text is reset if player is not in game
+                document.getElementById('joinGame').disabled = false;
+                document.getElementById('joinGame').textContent = 'Join Game';
             }
         }
     </script>
