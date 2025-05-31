@@ -230,7 +230,25 @@ function updateGamePhysics() {
   }
   
   // Colisiones con powerups
-  // (lógica de colisión con powerups similar a tu código original)
+  for (let i = gameState.powerups.length - 1; i >= 0; i--) {
+    const powerup = gameState.powerups[i];
+    const playersArray = Array.from(gameState.players.values()).filter(p => p.alive);
+    
+    for (let j = 0; j < playersArray.length; j++) {
+      const player = playersArray[j];
+      const dist = Math.sqrt(Math.pow(player.x - powerup.x, 2) + Math.pow(player.y - powerup.y, 2));
+      
+      if (dist < player.radius + 15) {
+        // Recoger powerup
+        player.powerup = powerup.type;
+        player.powerupEndTime = Date.now() + 5000; // 5 segundos de duración
+        
+        // Eliminar del array de forma segura
+        gameState.powerups.splice(i, 1);
+        break; // Salir del bucle interno una vez recogido el powerup
+      }
+    }
+  }
   
   // Generar powerups aleatoriamente
   if (Math.random() < 0.01 && gameState.gamePhase === 'playing' && gameState.powerups.length < 3) {
@@ -240,12 +258,74 @@ function updateGamePhysics() {
 
 // Función para verificar colisiones entre jugadores
 function checkCollision(p1, p2) {
-  // Lógica de colisión similar a tu código original
+  const dx = p1.x - p2.x;
+  const dy = p1.y - p2.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  
+  if (dist < p1.radius + p2.radius) {
+    // Física de colisión mejorada
+    const mass1 = p1.radius * p1.radius;  // Masa basada en el área
+    const mass2 = p2.radius * p2.radius;
+    
+    // Multiplicadores de fuerza
+    const strength1 = (p1.powerup === 'STRENGTH' ? 2.0 : 1.0) * p1.bet * 150; 
+    const strength2 = (p2.powerup === 'STRENGTH' ? 2.0 : 1.0) * p2.bet * 150;
+    
+    // Momentum basado en velocidad
+    const velocity1 = Math.sqrt(p1.vx * p1.vx + p1.vy * p1.vy);
+    const velocity2 = Math.sqrt(p2.vx * p2.vx + p2.vy * p2.vy);
+    const momentumFactor1 = 1 + velocity1 * 0.5;
+    const momentumFactor2 = 1 + velocity2 * 0.5;
+    
+    // Vector de colisión normalizado
+    const nx = dx / dist;
+    const ny = dy / dist;
+    
+    // Calcular fuerzas de impacto con momentum
+    const force1 = strength1 * momentumFactor1;
+    const force2 = strength2 * momentumFactor2;
+    
+    // Aplicar fuerzas considerando la masa
+    const pushForce = 3.5;
+    p1.vx += nx * (force2 / mass1) * pushForce;
+    p1.vy += ny * (force2 / mass1) * pushForce;
+    p2.vx -= nx * (force1 / mass2) * pushForce;
+    p2.vy -= ny * (force1 / mass2) * pushForce;
+    
+    // Separar jugadores más agresivamente
+    const overlap = (p1.radius + p2.radius) - dist + 2;
+    const separationForce = overlap * 0.6;
+    p1.x += nx * separationForce * (mass2 / (mass1 + mass2));
+    p1.y += ny * separationForce * (mass2 / (mass1 + mass2));
+    p2.x -= nx * separationForce * (mass1 / (mass1 + mass2));
+    p2.y -= ny * separationForce * (mass1 / (mass1 + mass2));
+  }
 }
 
 // Generar powerup
 function spawnPowerup() {
-  // Lógica de generación de powerups similar a tu código original
+  const centerX = 300;
+  const centerY = 300;
+  const ringRadius = 280;
+  
+  const POWERUP_TYPES = ['STRENGTH', 'SPEED', 'SHIELD', 'MAGNET'];
+  
+  if (gameState.powerups.length < 3) {
+    const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+    
+    // Generar dentro del ring pero no muy cerca del centro
+    const angle = Math.random() * Math.PI * 2;
+    const minRadius = ringRadius * 0.2;
+    const maxRadius = ringRadius * 0.7;
+    const distance = minRadius + Math.random() * (maxRadius - minRadius);
+    
+    gameState.powerups.push({
+      type: type,
+      x: centerX + Math.cos(angle) * distance,
+      y: centerY + Math.sin(angle) * distance,
+      rotation: 0
+    });
+  }
 }
 
 // Finalizar juego
