@@ -92,6 +92,11 @@ class GameConnection {
                     }
                     break;
                     
+                case 'error':
+                    console.error('Error del servidor:', message.message);
+                    alert(`Error: ${message.message}`);
+                    break;
+                    
                 default:
                     console.log('Mensaje desconocido:', message);
             }

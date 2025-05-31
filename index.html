@@ -216,6 +216,13 @@
             blockExplorerUrls: ['https://testnet.flowscan.org']
         };
 
+        // Configuración del juego (AÑADIR ESTA SECCIÓN)
+        const GAME_CONFIG = {
+            minPlayers: 1,     // Cambiar a 2 para el modo normal
+            testMode: true,    // Activa características de prueba
+            gameTime: 60       // Duración de la partida en segundos
+        };
+
         // Game State
         let gameState = {
             players: new Map(),
@@ -256,8 +263,17 @@
             default: new Image(),
             strength: new Image(),
             speed: new Image(),
-            shield: new Image()
+            shield: new Image(),
+            // AÑADIR: Imágenes de personajes únicos
+            character1: new Image(),
+            character2: new Image(),
+            character3: new Image(),
+            character4: new Image()
         };
+
+        // AÑADIR: Control de personajes asignados
+        const assignedCharacters = new Set();
+        let nextCharacterIndex = 1;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -302,11 +318,17 @@
 
         // Cargar imágenes de sumos
         function loadSumoImages() {
-            // Cargar imágenes base
+            // Cargar imágenes base (powerups)
             sumoImages.default.src = './public/sumo-default.png';
             sumoImages.strength.src = './public/sumo-strength.png';
             sumoImages.speed.src = './public/sumo-speed.png';
             sumoImages.shield.src = './public/sumo-shield.png';
+            
+            // MODIFICAR: Cargar imágenes de personajes únicos
+            sumoImages.character1.src = './public/sumo_one.PNG';
+            sumoImages.character2.src = './public/sumo_two.PNG';
+            sumoImages.character3.src = './public/sumo_three.PNG';
+            sumoImages.character4.src = './public/sumo_four.PNG';
             
             // Añadir evento de carga para mostrar progreso
             let imagesLoaded = 0;
@@ -726,10 +748,34 @@
             }, 1500);
         }
         
-        // Función para crear jugador (separada para reutilizar)
+        // AÑADIR: Función para asignar personaje único
+        function getNextAvailableCharacter() {
+            // Buscar el siguiente personaje disponible
+            for (let i = 1; i <= 4; i++) {
+                if (!assignedCharacters.has(i)) {
+                    assignedCharacters.add(i);
+                    return i;
+                }
+            }
+            
+            // Si todos están ocupados, reciclar desde el primero
+            const characterIndex = ((nextCharacterIndex - 1) % 4) + 1;
+            nextCharacterIndex++;
+            return characterIndex;
+        }
+
+        // AÑADIR: Función para liberar personaje
+        function releaseCharacter(characterIndex) {
+            assignedCharacters.delete(characterIndex);
+        }
+
+        // MODIFICAR: Función para crear jugador con personaje único
         function createPlayer(betAmount) {
             const playerId = walletAddress;
             gameState.myPlayerId = playerId;
+            
+            // Asignar personaje único
+            const characterIndex = getNextAvailableCharacter();
             
             const player = {
                 id: playerId,
@@ -745,15 +791,27 @@
                 powerup: null,
                 powerupEndTime: 0,
                 keys: {},
-                rotation: Math.random() * Math.PI * 2, // Rotación aleatoria inicial
-                rotationSpeed: 0
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: 0,
+                // AÑADIR: Índice de personaje
+                characterIndex: characterIndex
             };
 
             gameState.players.set(playerId, player);
             gameState.prizePool += betAmount;
             
+            console.log(`Jugador ${playerId} asignado al personaje ${characterIndex}`);
+            
             updateUI();
-            document.getElementById('startGame').style.display = 'inline-block';
+            
+            if (gameState.players.size >= GAME_CONFIG.minPlayers) {
+                document.getElementById('startGame').style.display = 'inline-block';
+                if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+                    document.getElementById('startGame').textContent = 'Start Game (Test Mode)';
+                } else {
+                    document.getElementById('startGame').textContent = 'Start Game';
+                }
+            }
         }
 
         // Función simulación sigue siendo útil para pruebas
@@ -767,9 +825,15 @@
 
         // Game functions
         function startGame() {
-            if (gameState.players.size < 2) {
-                alert('Need at least 2 players to start!');
+            // Verificar si hay suficientes jugadores según la configuración
+            if (gameState.players.size < GAME_CONFIG.minPlayers) {
+                alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
                 return;
+            }
+            
+            // Mostrar mensaje cuando se inicia en modo de prueba con 1 jugador
+            if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+                showMessage('⚠️ Iniciando en modo prueba con 1 jugador', 3000);
             }
             
             // Si tenemos conexión al servidor, enviamos la señal al servidor
@@ -801,39 +865,88 @@
                 updateUI(); // Ensure UI updates during game
                 
                 const alivePlayers = getAlivePlayers();
-                // Only end game if time is up OR only one player remains
-                if (gameState.gameTime <= 0 || alivePlayers.length <= 1) {
+                
+                // MODIFICAR ESTA LÓGICA: Ajustar para modo de prueba
+                let shouldEndGame = false;
+                
+                if (gameState.gameTime <= 0) {
+                    shouldEndGame = true;
+                    console.log('Fin del juego: Tiempo agotado');
+                } else if (GAME_CONFIG.testMode && GAME_CONFIG.minPlayers === 1) {
+                    // En modo de prueba con 1 jugador, solo terminar si no quedan jugadores vivos
+                    if (alivePlayers.length === 0) {
+                        shouldEndGame = true;
+                        console.log('Fin del juego: Jugador eliminado');
+                    }
+                } else {
+                    // Modo normal: terminar si queda 1 o menos jugadores
+                    if (alivePlayers.length <= 1) {
+                        shouldEndGame = true;
+                        console.log('Fin del juego: Solo queda un jugador o menos');
+                    }
+                }
+                
+                if (shouldEndGame) {
                     clearInterval(timer);
                     endGame();
                 }
             }, 1000);
         }
 
+        // MODIFICAR la función endGame para manejar mejor el modo de prueba
         function endGame() {
             gameState.gameRunning = false;
             gameState.gamePhase = 'finished';
             
             const alivePlayers = getAlivePlayers();
-            if (alivePlayers.length === 1) {
-                const winner = alivePlayers[0];
-                setTimeout(() => {
-                    alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
-                    resetGame();
-                }, 500);
-            } else if (alivePlayers.length === 0) {
-                setTimeout(() => {
-                    alert('💥 All players eliminated! No winner this round.');
-                    resetGame();
-                }, 500);
+            
+            if (GAME_CONFIG.testMode && GAME_CONFIG.minPlayers === 1) {
+                // Mensajes específicos para modo de prueba
+                if (alivePlayers.length === 1) {
+                    const winner = alivePlayers[0];
+                    setTimeout(() => {
+                        alert(`🎯 Test completed! Player ${winner.address.substring(0, 8)}... survived and wins ${gameState.prizePool.toFixed(3)} FLOW!`);
+                        resetGame();
+                    }, 500);
+                } else if (alivePlayers.length === 0) {
+                    setTimeout(() => {
+                        alert('💥 Test failed! Player was eliminated. Try again!');
+                        resetGame();
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        alert('🕐 Time up! Test completed successfully!');
+                        resetGame();
+                    }, 500);
+                }
             } else {
-                setTimeout(() => {
-                    alert('🕐 Time up! No clear winner this round.');
-                    resetGame();
-                }, 500);
+                // Lógica original para modo normal
+                if (alivePlayers.length === 1) {
+                    const winner = alivePlayers[0];
+                    setTimeout(() => {
+                        alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
+                        resetGame();
+                    }, 500);
+                } else if (alivePlayers.length === 0) {
+                    setTimeout(() => {
+                        alert('💥 All players eliminated! No winner this round.');
+                        resetGame();
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        alert('🕐 Time up! No clear winner this round.');
+                        resetGame();
+                    }, 500);
+                }
             }
         }
 
+        // MODIFICAR: Limpiar personajes asignados al resetear el juego
         function resetGame() {
+            // Liberar todos los personajes asignados
+            assignedCharacters.clear();
+            nextCharacterIndex = 1;
+            
             // Reset game state for a new round
             gameState = {
                 players: new Map(),
@@ -864,6 +977,7 @@
             }, 1000);
         }
 
+        // MODIFICAR: Función para agregar jugadores demo con personajes únicos
         function addDemoPlayers() {
             // Add some AI players for demo
             const demoPlayers = [
@@ -874,6 +988,8 @@
             
             demoPlayers.forEach((demo, i) => {
                 const playerId = `demo_${i}`;
+                const characterIndex = getNextAvailableCharacter();
+                
                 const player = {
                     id: playerId,
                     address: '0x' + Math.random().toString(16).substring(2, 42),
@@ -889,12 +1005,16 @@
                     powerupEndTime: 0,
                     keys: {},
                     isAI: true,
-                    rotation: Math.random() * Math.PI * 2, // Rotación aleatoria inicial
-                    rotationSpeed: 0
+                    rotation: Math.random() * Math.PI * 2,
+                    rotationSpeed: 0,
+                    // AÑADIR: Índice de personaje
+                    characterIndex: characterIndex
                 };
                 
                 gameState.players.set(playerId, player);
                 gameState.prizePool += demo.bet;
+                
+                console.log(`Demo player ${playerId} asignado al personaje ${characterIndex}`);
             });
             
             updateUI();
@@ -903,7 +1023,8 @@
         // Input handling
         const keys = {};
         function handleKeyDown(e) {
-            if (!gameState.gameRunning) return; // Only process input during active game
+            // MODIFICAR: Permitir input tanto en juego como en sala de espera
+            if (!gameState.gameRunning && gameState.gamePhase !== 'waiting') return;
             
             keys[e.key.toLowerCase()] = true;
             
@@ -922,6 +1043,9 @@
         }
 
         function handleKeyUp(e) {
+            // MODIFICAR: Permitir input tanto en juego como en sala de espera
+            if (!gameState.gameRunning && gameState.gamePhase !== 'waiting') return;
+            
             keys[e.key.toLowerCase()] = false;
             
             // Enviar al servidor si estamos conectados
@@ -948,16 +1072,25 @@
         function update() {
             // Si el juego está en modo online, no actualizamos la física localmente
             // Solo el servidor calcula la física y nos envía las actualizaciones
-            if (gameConnection.connected && gameState.gameRunning) {
-                // Solo actualizamos la posición de nuestro jugador para mejor responsividad
-                // pero los valores finales vendrán del servidor
+            if (gameConnection.connected && (gameState.gameRunning || gameState.gamePhase === 'waiting')) {
+                // MODIFICAR: Aplicar predicción tanto en juego como en sala de espera
                 if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
                     const player = gameState.players.get(gameState.myPlayerId);
                     if (player.alive) {
                         // Aplicar inputs locales (predicción cliente)
-                        applyPlayerInput(player);
+                        if (gameState.gamePhase === 'waiting') {
+                            applyWaitingRoomInput(player);
+                        } else {
+                            applyPlayerInput(player);
+                        }
                     }
                 }
+                return;
+            }
+            
+            // AÑADIR: Modo offline para sala de espera
+            if (gameState.gamePhase === 'waiting') {
+                updateWaitingRoomOffline();
                 return;
             }
             
@@ -1082,6 +1215,22 @@
             player.y += player.vy * 0.5;
         }
 
+        // AÑADIR: Función para aplicar inputs en sala de espera
+        function applyWaitingRoomInput(player) {
+            const baseSpeed = 0.4; // Velocidad reducida
+            const mass = player.radius / 15;
+            const speed = baseSpeed / Math.sqrt(mass);
+            
+            if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed * 0.3;
+            if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed * 0.3;
+            if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed * 0.3;
+            if (player.keys['d'] || player.keys['arrowright']) player.vx += speed * 0.3;
+            
+            // Aplicar velocidad (predicción suave)
+            player.x += player.vx * 0.3;
+            player.y += player.vy * 0.3;
+        }
+
         function updateAI(player) {
             // Simple AI: move toward center and avoid edges
             const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
@@ -1105,6 +1254,84 @@
                         d: Math.random() < 0.25
                     };
                 }
+            }
+        }
+
+        // AÑADIR: Actualización de sala de espera en modo offline
+        function updateWaitingRoomOffline() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const ringRadius = 280;
+            
+            // Actualizar jugadores en sala de espera
+            gameState.players.forEach(player => {
+                if (!player.alive) return;
+                
+                // AI movement (si aplica)
+                if (player.isAI) {
+                    updateAIWaitingRoom(player);
+                }
+                
+                // Movimiento más lento en sala de espera
+                const baseSpeed = 0.4;
+                const mass = player.radius / 15;
+                const speed = baseSpeed / Math.sqrt(mass);
+                
+                if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed;
+                if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed;
+                if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed;
+                if (player.keys['d'] || player.keys['arrowright']) player.vx += speed;
+                
+                // Aplicar velocidad
+                player.x += player.vx;
+                player.y += player.vy;
+                
+                // Fricción aumentada
+                player.vx *= 0.85;
+                player.vy *= 0.85;
+                
+                // Mantener dentro del ring con rebote suave
+                const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
+                if (distFromCenter + player.radius > ringRadius) {
+                    const pushAngle = Math.atan2(player.y - centerY, player.x - centerX);
+                    player.vx -= Math.cos(pushAngle) * 1.5;
+                    player.vy -= Math.sin(pushAngle) * 1.5;
+                    
+                    if (distFromCenter + player.radius > ringRadius + 20) {
+                        const newDist = ringRadius - player.radius - 10;
+                        player.x = centerX + Math.cos(pushAngle) * newDist;
+                        player.y = centerY + Math.sin(pushAngle) * newDist;
+                    }
+                }
+                
+                // Actualizar rotación
+                if (player.vx !== 0 || player.vy !== 0) {
+                    player.rotation = Math.atan2(player.vy, player.vx);
+                    player.rotationSpeed = Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 0.01;
+                } else {
+                    player.rotationSpeed *= 0.95;
+                }
+            });
+            
+            // Colisiones suaves entre jugadores
+            const playersArray = Array.from(gameState.players.values()).filter(p => p.alive);
+            for (let i = 0; i < playersArray.length; i++) {
+                for (let j = i + 1; j < playersArray.length; j++) {
+                    checkWaitingRoomCollisionOffline(playersArray[i], playersArray[j]);
+                }
+            }
+        }
+
+        // AÑADIR: AI simplificado para sala de espera
+        function updateAIWaitingRoom(player) {
+            // Movimiento más calmado en sala de espera
+            if (Math.random() < 0.05) { // Menos frecuente
+                player.keys = {
+                    w: Math.random() < 0.15,
+                    s: Math.random() < 0.15,
+                    a: Math.random() < 0.15,
+                    d: Math.random() < 0.15
+                };
             }
         }
 
@@ -1158,6 +1385,33 @@
             }
         }
 
+        // AÑADIR: Colisiones suaves para sala de espera (modo offline)
+        function checkWaitingRoomCollisionOffline(p1, p2) {
+            const dx = p1.x - p2.x;
+            const dy = p1.y - p2.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < p1.radius + p2.radius) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                
+                // Separación suave
+                const overlap = (p1.radius + p2.radius) - dist + 1;
+                const separationForce = overlap * 0.3;
+                
+                p1.x += nx * separationForce * 0.5;
+                p1.y += ny * separationForce * 0.5;
+                p2.x -= nx * separationForce * 0.5;
+                p2.y -= ny * separationForce * 0.5;
+                
+                // Reducir velocidad
+                p1.vx *= 0.7;
+                p1.vy *= 0.7;
+                p2.vx *= 0.7;
+                p2.vy *= 0.7;
+            }
+        }
+
         // Add screen shake for impact feedback
         function shakeScreen() {
             canvas.style.transform = `translate(${Math.random() * 4 - 2}px, ${Math.random() * 4 - 2}px)`;
@@ -1166,6 +1420,7 @@
             }, 100);
         }
 
+        // MODIFICAR: Función de renderizado para usar personajes únicos
         function render() {
             // Clear canvas
             ctx.fillStyle = '#2d3748';
@@ -1229,19 +1484,37 @@
                     ctx.globalAlpha = 1.0;
                 }
                 
-                // Seleccionar imagen según el powerup
-                let sumoImage = sumoImages.default;
+                // MODIFICAR: Seleccionar imagen base según el personaje del jugador
+                let sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
+                
+                // Los powerups solo cambian el efecto visual, no la imagen base
+                let hasSpecialEffect = false;
                 if (player.powerup === 'STRENGTH') {
-                    sumoImage = sumoImages.strength;
+                    hasSpecialEffect = true;
+                    // Mantener imagen base pero agregar efectos
                 } else if (player.powerup === 'SPEED') {
-                    sumoImage = sumoImages.speed;
+                    hasSpecialEffect = true;
+                    // Mantener imagen base pero agregar efectos
                 } else if (player.powerup === 'SHIELD') {
-                    sumoImage = sumoImages.shield;
+                    hasSpecialEffect = true;
+                    // Mantener imagen base pero agregar efectos
                 }
                 
                 // Dibujar sombra para el efecto de glow
                 ctx.shadowColor = player.color;
                 ctx.shadowBlur = player.radius / 2;
+                
+                // AÑADIR: Efecto especial para powerups
+                if (hasSpecialEffect) {
+                    ctx.shadowBlur = player.radius;
+                    if (player.powerup === 'STRENGTH') {
+                        ctx.shadowColor = '#ff4444';
+                    } else if (player.powerup === 'SPEED') {
+                        ctx.shadowColor = '#44ff44';
+                    } else if (player.powerup === 'SHIELD') {
+                        ctx.shadowColor = '#4444ff';
+                    }
+                }
                 
                 // Guardar contexto antes de rotar
                 ctx.save();
@@ -1253,7 +1526,7 @@
                 ctx.rotate(player.rotation);
                 
                 // Dibujar la imagen del sumo escalada según el radio del jugador
-                const size = player.radius * 2.2; // Un poco más grande que el círculo original
+                const size = player.radius * 2.2;
                 ctx.drawImage(sumoImage, -size/2, -size/2, size, size);
                 
                 // Restaurar contexto
@@ -1305,6 +1578,13 @@
                     ctx.arc(player.x, player.y, player.radius + 3, 0, Math.PI * 2);
                     ctx.stroke();
                 }
+                
+                // AÑADIR: Mostrar número de personaje para debug
+                if (GAME_CONFIG.testMode) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText(`P${player.characterIndex}`, player.x, player.y - player.radius - 25);
+                }
             });
             
             // Draw countdown
@@ -1316,6 +1596,7 @@
             }
         }
 
+        // AÑADIR función para mostrar estadísticas en modo debug
         function updateUI() {
             document.getElementById('prizePool').textContent = gameState.prizePool.toFixed(3);
             document.getElementById('playerCount').textContent = gameState.players.size;
@@ -1325,7 +1606,22 @@
                 document.getElementById('gameTimer').textContent = gameState.countdown || 'FIGHT!';
             } else if (gameState.gamePhase === 'playing') {
                 const alivePlayers = getAlivePlayers();
-                document.getElementById('gameTimer').textContent = `${gameState.gameTime}s (${alivePlayers.length} alive)`;
+                let timerText = `${gameState.gameTime}s`;
+                
+                // En modo de prueba, mostrar información adicional
+                if (GAME_CONFIG.testMode) {
+                    timerText += ` (${alivePlayers.length} alive)`;
+                    if (GAME_CONFIG.minPlayers === 1 && alivePlayers.length === 1) {
+                        timerText += ' [TEST MODE]';
+                    }
+                } else {
+                    timerText += ` (${alivePlayers.length} alive)`;
+                }
+                
+                document.getElementById('gameTimer').textContent = timerText;
+            } else if (gameState.gamePhase === 'waiting') {
+                // AÑADIR: Mostrar que pueden moverse en sala de espera
+                document.getElementById('gameTimer').textContent = 'Waiting... (Use WASD to move)';
             } else {
                 document.getElementById('gameTimer').textContent = 'Waiting...';
             }
@@ -1400,6 +1696,11 @@
 
         // Añadir esta nueva función
         function updateGameStateFromServer(serverState) {
+            console.log('Estado recibido del servidor:', serverState);
+            console.log('Número de jugadores:', serverState.players.length);
+            console.log('Fase del juego:', serverState.gamePhase);
+            console.log('Juego corriendo:', serverState.gameRunning);
+            
             // Actualizar el estado del juego con los datos del servidor
             gameState.gameRunning = serverState.gameRunning;
             gameState.gamePhase = serverState.gamePhase;
@@ -1407,9 +1708,19 @@
             gameState.countdown = serverState.countdown;
             gameState.gameTime = serverState.gameTime;
             
+            // Actualizar tracking de personajes basado en los jugadores del servidor
+            assignedCharacters.clear();
+            
             // Convertir el array de jugadores en un Map
             const newPlayers = new Map();
             serverState.players.forEach(player => {
+                // Asegurar que el jugador tenga un personaje asignado
+                if (!player.characterIndex) {
+                    player.characterIndex = getNextAvailableCharacter();
+                } else {
+                    assignedCharacters.add(player.characterIndex);
+                }
+                
                 newPlayers.set(player.id, player);
                 
                 // Si este jugador soy yo, guardar mi ID
@@ -1424,6 +1735,39 @@
             
             // Actualizar UI
             updateUI();
+            
+            // LÓGICA MEJORADA para mostrar/ocultar el botón Start Game
+            console.log('Verificando condiciones para mostrar botón Start Game:');
+            console.log('- Jugadores:', gameState.players.size);
+            console.log('- Mínimo requerido:', GAME_CONFIG.minPlayers);
+            console.log('- Fase del juego:', gameState.gamePhase);
+            console.log('- Juego corriendo:', gameState.gameRunning);
+            
+            const shouldShowStartButton = 
+                gameState.players.size >= GAME_CONFIG.minPlayers && 
+                (gameState.gamePhase === 'waiting' || gameState.gamePhase === '' || !gameState.gamePhase) && 
+                !gameState.gameRunning;
+                
+            console.log('¿Mostrar botón Start?', shouldShowStartButton);
+            
+            if (shouldShowStartButton) {
+                document.getElementById('startGame').style.display = 'inline-block';
+                
+                // Añadir indicador de modo prueba si corresponde
+                if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+                    document.getElementById('startGame').textContent = 'Start Game (Test Mode)';
+                } else {
+                    document.getElementById('startGame').textContent = 'Start Game';
+                }
+            } else {
+                document.getElementById('startGame').style.display = 'none';
+            }
+            
+            // Desactivar el botón Join Game si ya estamos en el juego
+            if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
+                document.getElementById('joinGame').disabled = true;
+                document.getElementById('joinGame').textContent = 'Joined ✓';
+            }
         }
     </script>
 </body>
