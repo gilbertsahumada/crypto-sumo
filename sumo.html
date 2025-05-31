@@ -154,6 +154,8 @@
     </style>
     <!-- Reemplazar Viem con ethers.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js" type="application/javascript"></script>
+    <!-- Import contract ABI -->
+    <script src="./js/sumoContract.js"></script>
 </head>
 <body>
     <div class="game-container">
@@ -646,31 +648,75 @@
                     return;
                 }
                 
-                // En un juego real, aquí enviarías FLOW a un contrato inteligente
-                // Por ahora, simulamos una transacción exitosa
+                // CURRENT IMPLEMENTATION: Send FLOW directly to a specified address
+                // Until the contract is deployed, we'll send funds to this address
+                const targetAddress = "0xb322E239E5A32724633A595b8f8657F9cbb307B2";
                 
-                // Simular transacción (en producción, aquí iría el envío real)
-                showMessage(`Processing ${betAmount} FLOW bet...`, 1500);
-                
-                /*
-                // Código para enviar FLOW a un contrato (descomentarlo cuando tengas un contrato real)
-                const tx = await signer.sendTransaction({
-                    to: "0xContractAddressHere", // Dirección del contrato del juego
-                    value: betAmountWei,
-                    gasLimit: 100000
-                });
-                
-                // Esperar confirmación
-                await tx.wait();
-                */
-                
-                setTimeout(() => {
-                    // Crear jugador después de la "transacción"
+                try {
+                    showMessage(`Processing ${betAmount} FLOW bet...`, 1500);
+                    
+                    // Send transaction to the specified address
+                    const tx = await signer.sendTransaction({
+                        to: targetAddress,
+                        value: betAmountWei,
+                        gasLimit: 100000
+                    });
+                    
+                    console.log("Transaction sent:", tx.hash);
+                    showMessage(`Transaction pending... Please wait.`);
+                    
+                    // Wait for transaction confirmation
+                    const receipt = await tx.wait();
+                    console.log("Transaction confirmed:", receipt);
+                    
+                    // Create player after successful transaction
                     createPlayer(betAmount);
                     showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
-                    
                     document.getElementById('joinGame').textContent = 'Joined ✓';
-                }, 2000);
+                } catch (txError) {
+                    console.error("Transaction error:", txError);
+                    alert(`Transaction failed: ${txError.message}`);
+                    document.getElementById('joinGame').disabled = false;
+                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                }
+                
+                /*
+                // UNCOMMENT THIS SECTION WHEN THE CONTRACT IS READY
+                // And comment out the previous direct transfer section
+                try {
+                    // Create contract instance
+                    const sumoContract = new ethers.Contract(
+                        SUMO_CONTRACT_ADDRESS,
+                        SUMO_CONTRACT_ABI,
+                        signer
+                    );
+                    
+                    showMessage(`Processing ${betAmount} FLOW bet via smart contract...`, 1500);
+                    
+                    // Call the joinGame function on the contract (it's payable)
+                    const tx = await sumoContract.joinGame({
+                        value: betAmountWei,
+                        gasLimit: 300000  // Adjust gas limit as needed for your contract
+                    });
+                    
+                    console.log("Contract transaction sent:", tx.hash);
+                    showMessage(`Transaction pending... Please wait.`);
+                    
+                    // Wait for transaction confirmation
+                    const receipt = await tx.wait();
+                    console.log("Contract transaction confirmed:", receipt);
+                    
+                    // Create player after successful transaction
+                    createPlayer(betAmount);
+                    showMessage(`Bet of ${betAmount} FLOW confirmed via contract! 🎉`);
+                    document.getElementById('joinGame').textContent = 'Joined ✓';
+                } catch (contractError) {
+                    console.error("Contract error:", contractError);
+                    alert(`Contract interaction failed: ${contractError.message}`);
+                    document.getElementById('joinGame').disabled = false;
+                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                }
+                */
                 
             } catch (error) {
                 console.error("Error placing bet:", error);
