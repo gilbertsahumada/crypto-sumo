@@ -16,6 +16,12 @@ const server = app.listen(PORT, () => {
 // Crear servidor WebSocket
 const wss = new WebSocket.Server({ server });
 
+// Configuración del servidor
+const SERVER_CONFIG = {
+  minPlayers: 1,  // Cambiar a 2 para el modo normal
+  debugMode: true // Activar para pruebas
+};
+
 // Estado del juego en el servidor
 const gameState = {
   players: new Map(),
@@ -67,8 +73,12 @@ wss.on('connection', (ws) => {
 
 // Procesar mensajes del cliente
 function handleClientMessage(ws, clientId, data) {
+  console.log(`Mensaje recibido de ${clientId}:`, data.type);
+  
   switch (data.type) {
     case 'joinGame':
+      console.log(`Jugador ${clientId} uniéndose con apuesta de ${data.bet} FLOW`);
+      
       // Añadir jugador al juego
       gameState.players.set(clientId, {
         id: clientId,
@@ -89,12 +99,26 @@ function handleClientMessage(ws, clientId, data) {
       });
       
       gameState.prizePool += data.bet;
+      
+      console.log(`Jugadores totales: ${gameState.players.size}, Pozo: ${gameState.prizePool}`);
+      console.log(`Estado del juego: fase=${gameState.gamePhase}, corriendo=${gameState.gameRunning}`);
+      
       broadcastGameState();
       break;
       
     case 'startGame':
-      if (gameState.players.size >= 2) {
+      console.log(`Solicitud de inicio de juego. Jugadores: ${gameState.players.size}, Mínimo: ${SERVER_CONFIG.minPlayers}`);
+      
+      // Verificar si hay suficientes jugadores (usando la configuración)
+      if (gameState.players.size >= SERVER_CONFIG.minPlayers) {
+        console.log(`Iniciando juego con ${gameState.players.size} jugadores (mínimo: ${SERVER_CONFIG.minPlayers})`);
         startGame();
+      } else {
+        console.log(`No se puede iniciar: insuficientes jugadores`);
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: `Se requieren al menos ${SERVER_CONFIG.minPlayers} jugadores para iniciar.`
+        }));
       }
       break;
       
@@ -137,7 +161,28 @@ function startGameTimer() {
     
     // Verificar fin del juego
     const alivePlayers = getAlivePlayers();
-    if (gameState.gameTime <= 0 || alivePlayers.length <= 1) {
+    
+    // MODIFICAR ESTA LÓGICA: En modo debug, permitir que un solo jugador continue
+    let shouldEndGame = false;
+    
+    if (gameState.gameTime <= 0) {
+      shouldEndGame = true;
+      console.log('Fin del juego: Tiempo agotado');
+    } else if (SERVER_CONFIG.debugMode && SERVER_CONFIG.minPlayers === 1) {
+      // En modo debug con 1 jugador, solo terminar si no quedan jugadores vivos
+      if (alivePlayers.length === 0) {
+        shouldEndGame = true;
+        console.log('Fin del juego: No quedan jugadores vivos');
+      }
+    } else {
+      // Modo normal: terminar si queda 1 o menos jugadores
+      if (alivePlayers.length <= 1) {
+        shouldEndGame = true;
+        console.log('Fin del juego: Solo queda un jugador o menos');
+      }
+    }
+    
+    if (shouldEndGame) {
       clearInterval(timer);
       endGame();
     }
@@ -360,6 +405,8 @@ function getAlivePlayers() {
 // Enviar estado del juego a todos los clientes
 function broadcastGameState() {
   const stateData = serializeGameState();
+  console.log(`Broadcasting game state: ${stateData.players.length} jugadores, fase: ${stateData.gamePhase}`);
+  
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({

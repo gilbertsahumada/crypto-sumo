@@ -216,6 +216,13 @@
             blockExplorerUrls: ['https://testnet.flowscan.org']
         };
 
+        // Configuración del juego (AÑADIR ESTA SECCIÓN)
+        const GAME_CONFIG = {
+            minPlayers: 1,     // Cambiar a 2 para el modo normal
+            testMode: true,    // Activa características de prueba
+            gameTime: 60       // Duración de la partida en segundos
+        };
+
         // Game State
         let gameState = {
             players: new Map(),
@@ -753,7 +760,16 @@
             gameState.prizePool += betAmount;
             
             updateUI();
-            document.getElementById('startGame').style.display = 'inline-block';
+            
+            // MODIFICAR ESTA PARTE: Mostrar botón inmediatamente si cumple los requisitos
+            if (gameState.players.size >= GAME_CONFIG.minPlayers) {
+                document.getElementById('startGame').style.display = 'inline-block';
+                if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+                    document.getElementById('startGame').textContent = 'Start Game (Test Mode)';
+                } else {
+                    document.getElementById('startGame').textContent = 'Start Game';
+                }
+            }
         }
 
         // Función simulación sigue siendo útil para pruebas
@@ -767,9 +783,15 @@
 
         // Game functions
         function startGame() {
-            if (gameState.players.size < 2) {
-                alert('Need at least 2 players to start!');
+            // Verificar si hay suficientes jugadores según la configuración
+            if (gameState.players.size < GAME_CONFIG.minPlayers) {
+                alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
                 return;
+            }
+            
+            // Mostrar mensaje cuando se inicia en modo de prueba con 1 jugador
+            if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+                showMessage('⚠️ Iniciando en modo prueba con 1 jugador', 3000);
             }
             
             // Si tenemos conexión al servidor, enviamos la señal al servidor
@@ -1400,6 +1422,11 @@
 
         // Añadir esta nueva función
         function updateGameStateFromServer(serverState) {
+            console.log('Estado recibido del servidor:', serverState);
+            console.log('Número de jugadores:', serverState.players.length);
+            console.log('Fase del juego:', serverState.gamePhase);
+            console.log('Juego corriendo:', serverState.gameRunning);
+            
             // Actualizar el estado del juego con los datos del servidor
             gameState.gameRunning = serverState.gameRunning;
             gameState.gamePhase = serverState.gamePhase;
@@ -1424,6 +1451,39 @@
             
             // Actualizar UI
             updateUI();
+            
+            // LÓGICA MEJORADA para mostrar/ocultar el botón Start Game
+            console.log('Verificando condiciones para mostrar botón Start Game:');
+            console.log('- Jugadores:', gameState.players.size);
+            console.log('- Mínimo requerido:', GAME_CONFIG.minPlayers);
+            console.log('- Fase del juego:', gameState.gamePhase);
+            console.log('- Juego corriendo:', gameState.gameRunning);
+            
+            const shouldShowStartButton = 
+                gameState.players.size >= GAME_CONFIG.minPlayers && 
+                (gameState.gamePhase === 'waiting' || gameState.gamePhase === '' || !gameState.gamePhase) && 
+                !gameState.gameRunning;
+                
+            console.log('¿Mostrar botón Start?', shouldShowStartButton);
+            
+            if (shouldShowStartButton) {
+                document.getElementById('startGame').style.display = 'inline-block';
+                
+                // Añadir indicador de modo prueba si corresponde
+                if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+                    document.getElementById('startGame').textContent = 'Start Game (Test Mode)';
+                } else {
+                    document.getElementById('startGame').textContent = 'Start Game';
+                }
+            } else {
+                document.getElementById('startGame').style.display = 'none';
+            }
+            
+            // Desactivar el botón Join Game si ya estamos en el juego
+            if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
+                document.getElementById('joinGame').disabled = true;
+                document.getElementById('joinGame').textContent = 'Joined ✓';
+            }
         }
     </script>
 </body>
