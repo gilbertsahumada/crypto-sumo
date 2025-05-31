@@ -156,6 +156,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js" type="application/javascript"></script>
     <!-- Import contract ABI -->
     <script src="./js/sumoContract.js"></script>
+    <script src="./js/websocket-client.js"></script>
 </head>
 <body>
     <div class="game-container">
@@ -263,14 +264,40 @@
             loadSumoImages();
             setupEthers();
             setupEventListeners();
+            
+            // Iniciar conexión WebSocket
+            gameConnection = new GameConnection();
+            
+            // Configurar callbacks de WebSocket
+            gameConnection.setCallback('onConnect', () => {
+                showMessage('Conectado al servidor del juego');
+            });
+            
+            gameConnection.setCallback('onDisconnect', () => {
+                showMessage('Desconectado del servidor del juego');
+            });
+            
+            gameConnection.setCallback('onGameState', (newState) => {
+                updateGameStateFromServer(newState);
+            });
+            
+            gameConnection.setCallback('onError', (error) => {
+                console.error('Error de conexión:', error);
+                showMessage('Error de conexión con el servidor');
+            });
+            
+            // Conectar al servidor
+            gameConnection.connect();
+            
+            // Iniciar bucle de renderizado local
             gameLoop();
             
-            // Add some demo players for testing
+            // En modo offline, añadir jugadores demo
             setTimeout(() => {
-                if (gameState.players.size === 0) {
+                if (gameState.players.size === 0 && !gameConnection.connected) {
                     addDemoPlayers();
                 }
-            }, 1000);
+            }, 2000);
         });
 
         // Cargar imágenes de sumos
@@ -626,8 +653,8 @@
                     return;
                 }
                 
-                // Si estamos en modo demo (sin wallet real o signer), simular la transacción
-                if (!signer) {
+                // Si estamos en modo demo o no hay conexión al servidor
+                if (!signer || !gameConnection.connected) {
                     simulateJoinGame(betAmount);
                     return;
                 }
@@ -648,14 +675,12 @@
                     return;
                 }
                 
-                // CURRENT IMPLEMENTATION: Send FLOW directly to a specified address
-                // Until the contract is deployed, we'll send funds to this address
+                // Procesar transacción igual que antes
                 const targetAddress = "0xb322E239E5A32724633A595b8f8657F9cbb307B2";
                 
                 try {
                     showMessage(`Processing ${betAmount} FLOW bet...`, 1500);
                     
-                    // Send transaction to the specified address
                     const tx = await signer.sendTransaction({
                         to: targetAddress,
                         value: betAmountWei,
@@ -665,12 +690,12 @@
                     console.log("Transaction sent:", tx.hash);
                     showMessage(`Transaction pending... Please wait.`);
                     
-                    // Wait for transaction confirmation
                     const receipt = await tx.wait();
                     console.log("Transaction confirmed:", receipt);
                     
-                    // Create player after successful transaction
-                    createPlayer(betAmount);
+                    // Unirse al juego a través de WebSocket
+                    gameConnection.joinGame(betAmount, walletAddress);
+                    
                     showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
                     document.getElementById('joinGame').textContent = 'Joined ✓';
                 } catch (txError) {
@@ -679,45 +704,6 @@
                     document.getElementById('joinGame').disabled = false;
                     document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
                 }
-                
-                /*
-                // UNCOMMENT THIS SECTION WHEN THE CONTRACT IS READY
-                // And comment out the previous direct transfer section
-                try {
-                    // Create contract instance
-                    const sumoContract = new ethers.Contract(
-                        SUMO_CONTRACT_ADDRESS,
-                        SUMO_CONTRACT_ABI,
-                        signer
-                    );
-                    
-                    showMessage(`Processing ${betAmount} FLOW bet via smart contract...`, 1500);
-                    
-                    // Call the joinGame function on the contract (it's payable)
-                    const tx = await sumoContract.joinGame({
-                        value: betAmountWei,
-                        gasLimit: 300000  // Adjust gas limit as needed for your contract
-                    });
-                    
-                    console.log("Contract transaction sent:", tx.hash);
-                    showMessage(`Transaction pending... Please wait.`);
-                    
-                    // Wait for transaction confirmation
-                    const receipt = await tx.wait();
-                    console.log("Contract transaction confirmed:", receipt);
-                    
-                    // Create player after successful transaction
-                    createPlayer(betAmount);
-                    showMessage(`Bet of ${betAmount} FLOW confirmed via contract! 🎉`);
-                    document.getElementById('joinGame').textContent = 'Joined ✓';
-                } catch (contractError) {
-                    console.error("Contract error:", contractError);
-                    alert(`Contract interaction failed: ${contractError.message}`);
-                    document.getElementById('joinGame').disabled = false;
-                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
-                }
-                */
-                
             } catch (error) {
                 console.error("Error placing bet:", error);
                 alert(`Error placing bet: ${error.message}`);
@@ -786,20 +772,26 @@
                 return;
             }
             
-            gameState.gamePhase = 'countdown';
-            gameState.countdown = 3;
-            document.getElementById('startGame').style.display = 'none';
-            
-            const countdownInterval = setInterval(() => {
-                gameState.countdown--;
-                if (gameState.countdown <= 0) {
-                    clearInterval(countdownInterval);
-                    gameState.gamePhase = 'playing';
-                    gameState.gameRunning = true;
-                    startGameTimer();
-                    spawnPowerup();
-                }
-            }, 1000);
+            // Si tenemos conexión al servidor, enviamos la señal al servidor
+            if (gameConnection.connected) {
+                gameConnection.startGame();
+            } else {
+                // Modo offline (como estaba antes)
+                gameState.gamePhase = 'countdown';
+                gameState.countdown = 3;
+                document.getElementById('startGame').style.display = 'none';
+                
+                const countdownInterval = setInterval(() => {
+                    gameState.countdown--;
+                    if (gameState.countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        gameState.gamePhase = 'playing';
+                        gameState.gameRunning = true;
+                        startGameTimer();
+                        spawnPowerup();
+                    }
+                }, 1000);
+            }
         }
 
         function startGameTimer() {
@@ -914,20 +906,34 @@
             if (!gameState.gameRunning) return; // Only process input during active game
             
             keys[e.key.toLowerCase()] = true;
+            
+            // Enviar al servidor si estamos conectados
+            if (gameConnection.connected && gameState.myPlayerId) {
+                gameConnection.sendPlayerInput(keys);
+            }
+            
+            // Actualización local para mejor responsividad
             if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
                 const player = gameState.players.get(gameState.myPlayerId);
-                if (player.alive) { // Only update if player is still alive
-                    player.keys = {...keys}; // Copy keys object
+                if (player.alive) {
+                    player.keys = {...keys};
                 }
             }
         }
 
         function handleKeyUp(e) {
             keys[e.key.toLowerCase()] = false;
+            
+            // Enviar al servidor si estamos conectados
+            if (gameConnection.connected && gameState.myPlayerId) {
+                gameConnection.sendPlayerInput(keys);
+            }
+            
+            // Actualización local para mejor responsividad
             if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
                 const player = gameState.players.get(gameState.myPlayerId);
-                if (player.alive) { // Only update if player is still alive
-                    player.keys = {...keys}; // Copy keys object
+                if (player.alive) {
+                    player.keys = {...keys};
                 }
             }
         }
@@ -940,6 +946,22 @@
         }
 
         function update() {
+            // Si el juego está en modo online, no actualizamos la física localmente
+            // Solo el servidor calcula la física y nos envía las actualizaciones
+            if (gameConnection.connected && gameState.gameRunning) {
+                // Solo actualizamos la posición de nuestro jugador para mejor responsividad
+                // pero los valores finales vendrán del servidor
+                if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
+                    const player = gameState.players.get(gameState.myPlayerId);
+                    if (player.alive) {
+                        // Aplicar inputs locales (predicción cliente)
+                        applyPlayerInput(player);
+                    }
+                }
+                return;
+            }
+            
+            // Modo offline: actualizar todo localmente como antes
             if (!gameState.gameRunning) return;
             
             // Update players
@@ -1041,6 +1063,23 @@
             if (Math.random() < 0.01 && gameState.gamePhase === 'playing') {
                 spawnPowerup();
             }
+        }
+
+        // Nueva función para aplicar inputs de jugador (predicción cliente)
+        function applyPlayerInput(player) {
+            // Movimiento basado en las teclas presionadas
+            const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7;
+            const mass = player.radius / 15;
+            const speed = baseSpeed / Math.sqrt(mass);
+            
+            if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed * 0.5;
+            if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed * 0.5;
+            if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed * 0.5;
+            if (player.keys['d'] || player.keys['arrowright']) player.vx += speed * 0.5;
+            
+            // Aplicar velocidad (solo una fracción para evitar desincronización)
+            player.x += player.vx * 0.5;
+            player.y += player.vy * 0.5;
         }
 
         function updateAI(player) {
@@ -1357,6 +1396,34 @@
                 message.style.transition = 'opacity 0.5s';
                 setTimeout(() => document.body.removeChild(message), 500);
             }, duration);
+        }
+
+        // Añadir esta nueva función
+        function updateGameStateFromServer(serverState) {
+            // Actualizar el estado del juego con los datos del servidor
+            gameState.gameRunning = serverState.gameRunning;
+            gameState.gamePhase = serverState.gamePhase;
+            gameState.prizePool = serverState.prizePool;
+            gameState.countdown = serverState.countdown;
+            gameState.gameTime = serverState.gameTime;
+            
+            // Convertir el array de jugadores en un Map
+            const newPlayers = new Map();
+            serverState.players.forEach(player => {
+                newPlayers.set(player.id, player);
+                
+                // Si este jugador soy yo, guardar mi ID
+                if (player.address === walletAddress) {
+                    gameState.myPlayerId = player.id;
+                }
+            });
+            gameState.players = newPlayers;
+            
+            // Actualizar powerups
+            gameState.powerups = serverState.powerups;
+            
+            // Actualizar UI
+            updateUI();
         }
     </script>
 </body>
