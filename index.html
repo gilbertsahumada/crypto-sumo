@@ -823,35 +823,79 @@
                 updateUI(); // Ensure UI updates during game
                 
                 const alivePlayers = getAlivePlayers();
-                // Only end game if time is up OR only one player remains
-                if (gameState.gameTime <= 0 || alivePlayers.length <= 1) {
+                
+                // MODIFICAR ESTA LÓGICA: Ajustar para modo de prueba
+                let shouldEndGame = false;
+                
+                if (gameState.gameTime <= 0) {
+                    shouldEndGame = true;
+                    console.log('Fin del juego: Tiempo agotado');
+                } else if (GAME_CONFIG.testMode && GAME_CONFIG.minPlayers === 1) {
+                    // En modo de prueba con 1 jugador, solo terminar si no quedan jugadores vivos
+                    if (alivePlayers.length === 0) {
+                        shouldEndGame = true;
+                        console.log('Fin del juego: Jugador eliminado');
+                    }
+                } else {
+                    // Modo normal: terminar si queda 1 o menos jugadores
+                    if (alivePlayers.length <= 1) {
+                        shouldEndGame = true;
+                        console.log('Fin del juego: Solo queda un jugador o menos');
+                    }
+                }
+                
+                if (shouldEndGame) {
                     clearInterval(timer);
                     endGame();
                 }
             }, 1000);
         }
 
+        // MODIFICAR la función endGame para manejar mejor el modo de prueba
         function endGame() {
             gameState.gameRunning = false;
             gameState.gamePhase = 'finished';
             
             const alivePlayers = getAlivePlayers();
-            if (alivePlayers.length === 1) {
-                const winner = alivePlayers[0];
-                setTimeout(() => {
-                    alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
-                    resetGame();
-                }, 500);
-            } else if (alivePlayers.length === 0) {
-                setTimeout(() => {
-                    alert('💥 All players eliminated! No winner this round.');
-                    resetGame();
-                }, 500);
+            
+            if (GAME_CONFIG.testMode && GAME_CONFIG.minPlayers === 1) {
+                // Mensajes específicos para modo de prueba
+                if (alivePlayers.length === 1) {
+                    const winner = alivePlayers[0];
+                    setTimeout(() => {
+                        alert(`🎯 Test completed! Player ${winner.address.substring(0, 8)}... survived and wins ${gameState.prizePool.toFixed(3)} FLOW!`);
+                        resetGame();
+                    }, 500);
+                } else if (alivePlayers.length === 0) {
+                    setTimeout(() => {
+                        alert('💥 Test failed! Player was eliminated. Try again!');
+                        resetGame();
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        alert('🕐 Time up! Test completed successfully!');
+                        resetGame();
+                    }, 500);
+                }
             } else {
-                setTimeout(() => {
-                    alert('🕐 Time up! No clear winner this round.');
-                    resetGame();
-                }, 500);
+                // Lógica original para modo normal
+                if (alivePlayers.length === 1) {
+                    const winner = alivePlayers[0];
+                    setTimeout(() => {
+                        alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
+                        resetGame();
+                    }, 500);
+                } else if (alivePlayers.length === 0) {
+                    setTimeout(() => {
+                        alert('💥 All players eliminated! No winner this round.');
+                        resetGame();
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        alert('🕐 Time up! No clear winner this round.');
+                        resetGame();
+                    }, 500);
+                }
             }
         }
 
@@ -1338,6 +1382,7 @@
             }
         }
 
+        // AÑADIR función para mostrar estadísticas en modo debug
         function updateUI() {
             document.getElementById('prizePool').textContent = gameState.prizePool.toFixed(3);
             document.getElementById('playerCount').textContent = gameState.players.size;
@@ -1347,7 +1392,19 @@
                 document.getElementById('gameTimer').textContent = gameState.countdown || 'FIGHT!';
             } else if (gameState.gamePhase === 'playing') {
                 const alivePlayers = getAlivePlayers();
-                document.getElementById('gameTimer').textContent = `${gameState.gameTime}s (${alivePlayers.length} alive)`;
+                let timerText = `${gameState.gameTime}s`;
+                
+                // En modo de prueba, mostrar información adicional
+                if (GAME_CONFIG.testMode) {
+                    timerText += ` (${alivePlayers.length} alive)`;
+                    if (GAME_CONFIG.minPlayers === 1 && alivePlayers.length === 1) {
+                        timerText += ' [TEST MODE]';
+                    }
+                } else {
+                    timerText += ` (${alivePlayers.length} alive)`;
+                }
+                
+                document.getElementById('gameTimer').textContent = timerText;
             } else {
                 document.getElementById('gameTimer').textContent = 'Waiting...';
             }
