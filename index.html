@@ -261,10 +261,11 @@
         // Precargar imágenes de sumo
         const sumoImages = {
             default: new Image(),
+            // MODIFICAR: Imágenes específicas de powerups
             strength: new Image(),
             speed: new Image(),
             shield: new Image(),
-            // AÑADIR: Imágenes de personajes únicos
+            // Imágenes de personajes únicos
             character1: new Image(),
             character2: new Image(),
             character3: new Image(),
@@ -318,11 +319,11 @@
 
         // Cargar imágenes de sumos
         function loadSumoImages() {
-            // Cargar imágenes base (powerups)
+            // MODIFICAR: Cargar imágenes específicas de powerups
             sumoImages.default.src = './public/sumo-default.png';
-            sumoImages.strength.src = './public/sumo-strength.png';
-            sumoImages.speed.src = './public/sumo-speed.png';
-            sumoImages.shield.src = './public/sumo-shield.png';
+            sumoImages.strength.src = './public/sumo_strength.PNG';
+            sumoImages.speed.src = './public/sumo_speed.PNG';
+            sumoImages.shield.src = './public/sumo_shield.PNG';
             
             // MODIFICAR: Cargar imágenes de personajes únicos
             sumoImages.character1.src = './public/sumo_one.PNG';
@@ -1420,7 +1421,7 @@
             }, 100);
         }
 
-        // MODIFICAR: Función de renderizado para usar personajes únicos
+        // MODIFICAR: Función de renderizado para usar imágenes de powerups
         function render() {
             // Clear canvas
             ctx.fillStyle = '#2d3748';
@@ -1484,37 +1485,62 @@
                     ctx.globalAlpha = 1.0;
                 }
                 
-                // MODIFICAR: Seleccionar imagen base según el personaje del jugador
-                let sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
+                // MODIFICAR: Seleccionar imagen según powerup o personaje base
+                let sumoImage;
                 
-                // Los powerups solo cambian el efecto visual, no la imagen base
-                let hasSpecialEffect = false;
-                if (player.powerup === 'STRENGTH') {
-                    hasSpecialEffect = true;
-                    // Mantener imagen base pero agregar efectos
-                } else if (player.powerup === 'SPEED') {
-                    hasSpecialEffect = true;
-                    // Mantener imagen base pero agregar efectos
-                } else if (player.powerup === 'SHIELD') {
-                    hasSpecialEffect = true;
-                    // Mantener imagen base pero agregar efectos
+                if (player.powerup) {
+                    // Si tiene powerup, usar la imagen específica del powerup
+                    switch (player.powerup) {
+                        case 'STRENGTH':
+                            sumoImage = sumoImages.strength;
+                            break;
+                        case 'SPEED':
+                            sumoImage = sumoImages.speed;
+                            break;
+                        case 'SHIELD':
+                            sumoImage = sumoImages.shield;
+                            break;
+                        default:
+                            // Para MAGNET o cualquier otro powerup, usar imagen base del personaje
+                            sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
+                    }
+                } else {
+                    // Sin powerup, usar imagen base del personaje
+                    sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
                 }
                 
-                // Dibujar sombra para el efecto de glow
-                ctx.shadowColor = player.color;
-                ctx.shadowBlur = player.radius / 2;
+                // Asegurar que la imagen existe, si no usar default
+                if (!sumoImage || !sumoImage.complete) {
+                    sumoImage = sumoImages.character1;
+                }
                 
-                // AÑADIR: Efecto especial para powerups
-                if (hasSpecialEffect) {
-                    ctx.shadowBlur = player.radius;
-                    if (player.powerup === 'STRENGTH') {
-                        ctx.shadowColor = '#ff4444';
-                    } else if (player.powerup === 'SPEED') {
-                        ctx.shadowColor = '#44ff44';
-                    } else if (player.powerup === 'SHIELD') {
-                        ctx.shadowColor = '#4444ff';
+                // MODIFICAR: Efectos visuales mejorados para powerups
+                let glowIntensity = player.radius / 2;
+                let glowColor = player.color;
+                
+                if (player.powerup) {
+                    glowIntensity = player.radius * 1.2;
+                    switch (player.powerup) {
+                        case 'STRENGTH':
+                            glowColor = '#ff4444';
+                            break;
+                        case 'SPEED':
+                            glowColor = '#44ff44';
+                            break;
+                        case 'SHIELD':
+                            glowColor = '#4444ff';
+                            break;
+                        case 'MAGNET':
+                            glowColor = '#ff44ff';
+                            break;
+                        default:
+                            glowColor = player.color;
                     }
                 }
+                
+                // Dibujar sombra/glow
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = glowIntensity;
                 
                 // Guardar contexto antes de rotar
                 ctx.save();
@@ -1525,21 +1551,93 @@
                 // Rotar según la dirección de movimiento
                 ctx.rotate(player.rotation);
                 
-                // Dibujar la imagen del sumo escalada según el radio del jugador
-                const size = player.radius * 2.2;
+                // AÑADIR: Efecto de pulsación para powerups
+                let sizeMultiplier = 2.2;
+                if (player.powerup) {
+                    // Crear efecto de pulsación basado en el tiempo
+                    const pulseTime = Date.now() * 0.005;
+                    sizeMultiplier = 2.2 + Math.sin(pulseTime) * 0.1;
+                }
+                
+                // Dibujar la imagen del sumo
+                const size = player.radius * sizeMultiplier;
                 ctx.drawImage(sumoImage, -size/2, -size/2, size, size);
                 
                 // Restaurar contexto
                 ctx.restore();
                 ctx.shadowBlur = 0;
                 
-                // Si tiene escudo, dibujar círculo alrededor
+                // MODIFICAR: Efectos adicionales para powerups específicos
                 if (player.powerup === 'SHIELD') {
+                    // Dibujar escudo protector animado
+                    const shieldTime = Date.now() * 0.003;
                     ctx.strokeStyle = '#4444ff';
                     ctx.lineWidth = 4;
+                    ctx.globalAlpha = 0.7 + Math.sin(shieldTime) * 0.3;
                     ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius + 8, 0, Math.PI * 2);
+                    ctx.arc(player.x, player.y, player.radius + 8 + Math.sin(shieldTime) * 2, 0, Math.PI * 2);
                     ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                if (player.powerup === 'SPEED') {
+                    // Dibujar líneas de velocidad
+                    const speedLines = 6;
+                    ctx.strokeStyle = '#44ff44';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.6;
+                    
+                    for (let i = 0; i < speedLines; i++) {
+                        const angle = (Math.PI * 2 * i) / speedLines + Date.now() * 0.01;
+                        const lineLength = player.radius + 15;
+                        const startX = player.x + Math.cos(angle) * player.radius;
+                        const startY = player.y + Math.sin(angle) * player.radius;
+                        const endX = player.x + Math.cos(angle) * lineLength;
+                        const endY = player.y + Math.sin(angle) * lineLength;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                if (player.powerup === 'STRENGTH') {
+                    // Dibujar partículas de fuerza
+                    const strengthTime = Date.now() * 0.008;
+                    const particles = 8;
+                    ctx.fillStyle = '#ff4444';
+                    ctx.globalAlpha = 0.8;
+                    
+                    for (let i = 0; i < particles; i++) {
+                        const angle = (Math.PI * 2 * i) / particles + strengthTime;
+                        const distance = player.radius + 12 + Math.sin(strengthTime + i) * 8;
+                        const particleX = player.x + Math.cos(angle) * distance;
+                        const particleY = player.y + Math.sin(angle) * distance;
+                        const particleSize = 3 + Math.sin(strengthTime * 2 + i) * 2;
+                        
+                        ctx.beginPath();
+                        ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                if (player.powerup === 'MAGNET') {
+                    // Dibujar ondas magnéticas
+                    const magnetTime = Date.now() * 0.004;
+                    ctx.strokeStyle = '#ff44ff';
+                    ctx.lineWidth = 2;
+                    
+                    for (let i = 1; i <= 3; i++) {
+                        ctx.globalAlpha = 0.5 - (i * 0.1);
+                        const waveRadius = player.radius + (i * 15) + Math.sin(magnetTime + i) * 5;
+                        ctx.beginPath();
+                        ctx.arc(player.x, player.y, waveRadius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1.0;
                 }
                 
                 // Show danger indicator when near edge
@@ -1563,11 +1661,44 @@
                 ctx.strokeText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
                 ctx.fillText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
                 
-                // Powerup indicator
+                // MODIFICAR: Powerup indicator mejorado
                 if (player.powerup) {
                     const type = POWERUP_TYPES[player.powerup];
+                    
+                    // Fondo del indicador
+                    ctx.fillStyle = type.color;
+                    ctx.globalAlpha = 0.8;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y - player.radius - 15, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    
+                    // Emoji del powerup
                     ctx.font = '16px Arial';
+                    ctx.fillStyle = 'white';
                     ctx.fillText(type.emoji, player.x, player.y - player.radius - 10);
+                    
+                    // Barra de tiempo restante
+                    if (player.powerupEndTime) {
+                        const remainingTime = Math.max(0, player.powerupEndTime - Date.now());
+                        const totalTime = type.duration;
+                        const timePercent = remainingTime / totalTime;
+                        
+                        if (timePercent > 0) {
+                            const barWidth = 30;
+                            const barHeight = 4;
+                            const barX = player.x - barWidth / 2;
+                            const barY = player.y - player.radius - 30;
+                            
+                            // Fondo de la barra
+                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                            ctx.fillRect(barX, barY, barWidth, barHeight);
+                            
+                            // Barra de progreso
+                            ctx.fillStyle = type.color;
+                            ctx.fillRect(barX, barY, barWidth * timePercent, barHeight);
+                        }
+                    }
                 }
                 
                 // Player is you indicator
@@ -1579,11 +1710,11 @@
                     ctx.stroke();
                 }
                 
-                // AÑADIR: Mostrar número de personaje para debug
+                // Mostrar número de personaje para debug
                 if (GAME_CONFIG.testMode) {
                     ctx.fillStyle = '#FFD700';
                     ctx.font = 'bold 10px Arial';
-                    ctx.fillText(`P${player.characterIndex}`, player.x, player.y - player.radius - 25);
+                    ctx.fillText(`P${player.characterIndex}`, player.x, player.y - player.radius - 35);
                 }
             });
             
