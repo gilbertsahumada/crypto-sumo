@@ -1,0 +1,26 @@
+{
+  "name": "crypto-sumo",
+  "version": "1.0.0",
+  "description": "Juego de sumo blockchain multijugador",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
+  },
+  "keywords": [
+    "blockchain",
+    "game",
+    "websocket",
+    "multiplayer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.13.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
