@@ -113,6 +113,19 @@ function handleClientMessage(ws, clientId, data) {
       // MODIFICAR: Asignar personaje único al jugador
       const characterIndex = getNextAvailableCharacter();
       
+      // MODIFICAR: Cálculo mejorado del tamaño basado en la apuesta
+      const calculatePlayerSize = (bet) => {
+        // Tamaño base mínimo
+        const minSize = 20;
+        // Tamaño máximo para evitar personajes demasiado grandes
+        const maxSize = 50;
+        // Factor de escala: cada 0.01 FLOW añade ~10 unidades de radio
+        const scaleFactor = 1000;
+        
+        const calculatedSize = minSize + (bet * scaleFactor);
+        return Math.max(minSize, Math.min(maxSize, calculatedSize));
+      };
+      
       // Añadir jugador al juego
       gameState.players.set(clientId, {
         id: clientId,
@@ -122,7 +135,7 @@ function handleClientMessage(ws, clientId, data) {
         y: 300 + (Math.random() - 0.5) * 200,
         vx: 0,
         vy: 0,
-        radius: Math.max(15, Math.min(35, 15 + data.bet * 500)),
+        radius: calculatePlayerSize(data.bet), // Usar nueva función de cálculo
         color: data.color || `hsl(${Math.random() * 360}, 70%, 60%)`,
         alive: true,
         powerup: null,
@@ -136,9 +149,7 @@ function handleClientMessage(ws, clientId, data) {
       
       gameState.prizePool += data.bet;
       
-      console.log(`Jugador ${clientId} asignado al personaje ${characterIndex}`);
-      console.log(`Jugadores totales: ${gameState.players.size}, Pozo: ${gameState.prizePool}`);
-      console.log(`Estado del juego: fase=${gameState.gamePhase}, corriendo=${gameState.gameRunning}`);
+      console.log(`Jugador ${clientId} asignado al personaje ${characterIndex}, tamaño: ${calculatePlayerSize(data.bet)}`);
       
       // AÑADIR: Iniciar física de sala de espera si es el primer jugador
       if (gameState.players.size === 1 && gameState.gamePhase === 'waiting') {

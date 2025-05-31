@@ -261,10 +261,11 @@
         // Precargar imágenes de sumo
         const sumoImages = {
             default: new Image(),
+            // MODIFICAR: Imágenes específicas de powerups
             strength: new Image(),
             speed: new Image(),
             shield: new Image(),
-            // AÑADIR: Imágenes de personajes únicos
+            // Imágenes de personajes únicos
             character1: new Image(),
             character2: new Image(),
             character3: new Image(),
@@ -318,11 +319,11 @@
 
         // Cargar imágenes de sumos
         function loadSumoImages() {
-            // Cargar imágenes base (powerups)
+            // MODIFICAR: Cargar imágenes específicas de powerups
             sumoImages.default.src = './public/sumo-default.png';
-            sumoImages.strength.src = './public/sumo-strength.png';
-            sumoImages.speed.src = './public/sumo-speed.png';
-            sumoImages.shield.src = './public/sumo-shield.png';
+            sumoImages.strength.src = './public/sumo_strength.PNG';
+            sumoImages.speed.src = './public/sumo_speed.PNG';
+            sumoImages.shield.src = './public/sumo_shield.PNG';
             
             // MODIFICAR: Cargar imágenes de personajes únicos
             sumoImages.character1.src = './public/sumo_one.PNG';
@@ -769,7 +770,20 @@
             assignedCharacters.delete(characterIndex);
         }
 
-        // MODIFICAR: Función para crear jugador con personaje único
+        // AÑADIR: Función para calcular tamaño del jugador
+        function calculatePlayerSize(bet) {
+            // Tamaño base mínimo
+            const minSize = 20;
+            // Tamaño máximo para evitar personajes demasiado grandes
+            const maxSize = 50;
+            // Factor de escala: cada 0.01 FLOW añade ~10 unidades de radio
+            const scaleFactor = 1000;
+            
+            const calculatedSize = minSize + (bet * scaleFactor);
+            return Math.max(minSize, Math.min(maxSize, calculatedSize));
+        }
+
+        // MODIFICAR: Función para crear jugador con tamaño proporcional
         function createPlayer(betAmount) {
             const playerId = walletAddress;
             gameState.myPlayerId = playerId;
@@ -785,7 +799,7 @@
                 y: centerY + (Math.random() - 0.5) * 200,
                 vx: 0,
                 vy: 0,
-                radius: Math.max(15, Math.min(35, 15 + betAmount * 500)),
+                radius: calculatePlayerSize(betAmount), // Usar nueva función de cálculo
                 color: `hsl(${Math.random() * 360}, 70%, 60%)`,
                 alive: true,
                 powerup: null,
@@ -800,7 +814,7 @@
             gameState.players.set(playerId, player);
             gameState.prizePool += betAmount;
             
-            console.log(`Jugador ${playerId} asignado al personaje ${characterIndex}`);
+            console.log(`Jugador ${playerId} asignado al personaje ${characterIndex}, tamaño: ${player.radius}`);
             
             updateUI();
             
@@ -866,24 +880,19 @@
                 
                 const alivePlayers = getAlivePlayers();
                 
-                // MODIFICAR ESTA LÓGICA: Ajustar para modo de prueba
+                // MODIFICAR: Simplificar lógica - terminar si queda 1 o menos jugadores
                 let shouldEndGame = false;
                 
-                if (gameState.gameTime <= 0) {
+                if (alivePlayers.length <= 1) {
+                    shouldEndGame = true;
+                    if (alivePlayers.length === 1) {
+                        console.log(`Fin del juego: Ganador encontrado - ${alivePlayers[0].address.substring(0, 8)}...`);
+                    } else {
+                        console.log('Fin del juego: No quedan jugadores vivos');
+                    }
+                } else if (gameState.gameTime <= 0) {
                     shouldEndGame = true;
                     console.log('Fin del juego: Tiempo agotado');
-                } else if (GAME_CONFIG.testMode && GAME_CONFIG.minPlayers === 1) {
-                    // En modo de prueba con 1 jugador, solo terminar si no quedan jugadores vivos
-                    if (alivePlayers.length === 0) {
-                        shouldEndGame = true;
-                        console.log('Fin del juego: Jugador eliminado');
-                    }
-                } else {
-                    // Modo normal: terminar si queda 1 o menos jugadores
-                    if (alivePlayers.length <= 1) {
-                        shouldEndGame = true;
-                        console.log('Fin del juego: Solo queda un jugador o menos');
-                    }
                 }
                 
                 if (shouldEndGame) {
@@ -893,51 +902,43 @@
             }, 1000);
         }
 
-        // MODIFICAR la función endGame para manejar mejor el modo de prueba
+        // MODIFICAR: Simplificar función endGame
         function endGame() {
             gameState.gameRunning = false;
             gameState.gamePhase = 'finished';
             
             const alivePlayers = getAlivePlayers();
             
-            if (GAME_CONFIG.testMode && GAME_CONFIG.minPlayers === 1) {
-                // Mensajes específicos para modo de prueba
-                if (alivePlayers.length === 1) {
-                    const winner = alivePlayers[0];
-                    setTimeout(() => {
+            // Lógica unificada para todos los modos
+            if (alivePlayers.length === 1) {
+                const winner = alivePlayers[0];
+                setTimeout(() => {
+                    if (GAME_CONFIG.testMode) {
                         alert(`🎯 Test completed! Player ${winner.address.substring(0, 8)}... survived and wins ${gameState.prizePool.toFixed(3)} FLOW!`);
-                        resetGame();
-                    }, 500);
-                } else if (alivePlayers.length === 0) {
-                    setTimeout(() => {
-                        alert('💥 Test failed! Player was eliminated. Try again!');
-                        resetGame();
-                    }, 500);
-                } else {
-                    setTimeout(() => {
-                        alert('🕐 Time up! Test completed successfully!');
-                        resetGame();
-                    }, 500);
-                }
-            } else {
-                // Lógica original para modo normal
-                if (alivePlayers.length === 1) {
-                    const winner = alivePlayers[0];
-                    setTimeout(() => {
+                    } else {
                         alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
-                        resetGame();
-                    }, 500);
-                } else if (alivePlayers.length === 0) {
-                    setTimeout(() => {
+                    }
+                    resetGame();
+                }, 500);
+            } else if (alivePlayers.length === 0) {
+                setTimeout(() => {
+                    if (GAME_CONFIG.testMode) {
+                        alert('💥 Test failed! All players were eliminated. Try again!');
+                    } else {
                         alert('💥 All players eliminated! No winner this round.');
-                        resetGame();
-                    }, 500);
-                } else {
-                    setTimeout(() => {
+                    }
+                    resetGame();
+                }, 500);
+            } else {
+                // Solo si el tiempo se agotó con múltiples jugadores vivos
+                setTimeout(() => {
+                    if (GAME_CONFIG.testMode) {
+                        alert('🕐 Time up! Test completed - multiple survivors!');
+                    } else {
                         alert('🕐 Time up! No clear winner this round.');
-                        resetGame();
-                    }, 500);
-                }
+                    }
+                    resetGame();
+                }, 500);
             }
         }
 
@@ -977,13 +978,13 @@
             }, 1000);
         }
 
-        // MODIFICAR: Función para agregar jugadores demo con personajes únicos
+        // MODIFICAR: Función para agregar jugadores demo con tamaños variados
         function addDemoPlayers() {
-            // Add some AI players for demo
+            // Add some AI players for demo with varied bet amounts
             const demoPlayers = [
-                { bet: 0.005, color: '#ff6b6b' },
-                { bet: 0.015, color: '#4ecdc4' },
-                { bet: 0.008, color: '#45b7d1' }
+                { bet: 0.005, color: '#ff6b6b' },   // Pequeño
+                { bet: 0.025, color: '#4ecdc4' },   // Grande
+                { bet: 0.015, color: '#45b7d1' }    // Mediano
             ];
             
             demoPlayers.forEach((demo, i) => {
@@ -998,7 +999,7 @@
                     y: centerY + (Math.random() - 0.5) * 200,
                     vx: 0,
                     vy: 0,
-                    radius: Math.max(15, Math.min(35, 15 + demo.bet * 500)),
+                    radius: calculatePlayerSize(demo.bet), // Usar nueva función de cálculo
                     color: demo.color,
                     alive: true,
                     powerup: null,
@@ -1014,7 +1015,7 @@
                 gameState.players.set(playerId, player);
                 gameState.prizePool += demo.bet;
                 
-                console.log(`Demo player ${playerId} asignado al personaje ${characterIndex}`);
+                console.log(`Demo player ${playerId} asignado al personaje ${characterIndex}, tamaño: ${player.radius}`);
             });
             
             updateUI();
@@ -1106,10 +1107,11 @@
                     updateAI(player);
                 }
                 
-                // Movement - Increased base speed and power
-                const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7; // Increased from 0.8/0.4
-                const mass = player.radius / 15; // Mass factor based on size
-                const speed = baseSpeed / Math.sqrt(mass); // Bigger players move slower but hit harder
+                // MODIFICAR: Movimiento ajustado por tamaño del jugador
+                const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7;
+                // Factor de masa más realista: jugadores más grandes son más lentos pero más fuertes
+                const mass = Math.pow(player.radius / 20, 1.5); // Más gradual que el anterior
+                const speed = baseSpeed / Math.sqrt(mass);
                 
                 if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed;
                 if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed;
@@ -1130,8 +1132,20 @@
                     // Give player a chance to recover if just touching edge
                     if (distFromCenter + player.radius > ringRadius + 10) {
                         player.alive = false;
-                        // Don't end game immediately, let the timer check handle it
-                        console.log(`Player ${player.address.substring(0, 8)} eliminated! ${getAlivePlayers().length - 1} players remaining.`);
+                        // MODIFICAR: Mejorar mensaje de eliminación
+                        const remainingAlive = getAlivePlayers().length - 1; // -1 porque este jugador aún cuenta como vivo en el array
+                        console.log(`Player ${player.address.substring(0, 8)} eliminated! ${remainingAlive} players remaining.`);
+                        
+                        // AÑADIR: Verificar inmediatamente si el juego debe terminar
+                        if (remainingAlive <= 1) {
+                            console.log('Verificación inmediata: Juego debe terminar por eliminación');
+                            // Pequeño delay para que la eliminación se procese visualmente
+                            setTimeout(() => {
+                                if (gameState.gameRunning) { // Solo si el juego aún está corriendo
+                                    endGame();
+                                }
+                            }, 100);
+                        }
                     } else {
                         // Push back toward center with strong force
                         const pushAngle = Math.atan2(player.y - centerY, player.x - centerX);
@@ -1202,7 +1216,8 @@
         function applyPlayerInput(player) {
             // Movimiento basado en las teclas presionadas
             const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7;
-            const mass = player.radius / 15;
+            // MODIFICAR: Factor de masa más realista basado en el tamaño
+            const mass = Math.pow(player.radius / 20, 1.5); // Más gradual
             const speed = baseSpeed / Math.sqrt(mass);
             
             if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed * 0.5;
@@ -1218,7 +1233,8 @@
         // AÑADIR: Función para aplicar inputs en sala de espera
         function applyWaitingRoomInput(player) {
             const baseSpeed = 0.4; // Velocidad reducida
-            const mass = player.radius / 15;
+            // MODIFICAR: Factor de masa más realista
+            const mass = Math.pow(player.radius / 20, 1.5);
             const speed = baseSpeed / Math.sqrt(mass);
             
             if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed * 0.3;
@@ -1272,9 +1288,9 @@
                     updateAIWaitingRoom(player);
                 }
                 
-                // Movimiento más lento en sala de espera
+                // MODIFICAR: Movimiento ajustado por tamaño en sala de espera
                 const baseSpeed = 0.4;
-                const mass = player.radius / 15;
+                const mass = Math.pow(player.radius / 20, 1.5);
                 const speed = baseSpeed / Math.sqrt(mass);
                 
                 if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed;
@@ -1341,13 +1357,13 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist < p1.radius + p2.radius) {
-                // Enhanced collision with better physics
-                const mass1 = p1.radius * p1.radius; // Mass based on area
-                const mass2 = p2.radius * p2.radius;
+                // MODIFICAR: Masa más realista basada en el área del círculo
+                const mass1 = Math.PI * p1.radius * p1.radius; // Área real del círculo
+                const mass2 = Math.PI * p2.radius * p2.radius;
                 
-                // Strength multipliers
-                const strength1 = (p1.powerup === 'STRENGTH' ? 2.0 : 1.0) * p1.bet * 150; // Increased from 100
-                const strength2 = (p2.powerup === 'STRENGTH' ? 2.0 : 1.0) * p2.bet * 150;
+                // MODIFICAR: Fuerza basada en la apuesta y el tamaño
+                const strength1 = (p1.powerup === 'STRENGTH' ? 2.0 : 1.0) * p1.bet * 200; // Aumentado
+                const strength2 = (p2.powerup === 'STRENGTH' ? 2.0 : 1.0) * p2.bet * 200;
                 
                 // Velocity-based momentum (players moving faster hit harder)
                 const velocity1 = Math.sqrt(p1.vx * p1.vx + p1.vy * p1.vy);
@@ -1364,15 +1380,15 @@
                 const force2 = strength2 * momentumFactor2;
                 
                 // Apply forces with mass consideration
-                const pushForce = 3.5; // Increased from 2
+                const pushForce = 4.0; // Aumentado para hacer las colisiones más impactantes
                 p1.vx += nx * (force2 / mass1) * pushForce;
                 p1.vy += ny * (force2 / mass1) * pushForce;
                 p2.vx -= nx * (force1 / mass2) * pushForce;
                 p2.vy -= ny * (force1 / mass2) * pushForce;
                 
                 // Separate players more aggressively
-                const overlap = (p1.radius + p2.radius) - dist + 2; // Added +2 for better separation
-                const separationForce = overlap * 0.6; // Increased from 0.5
+                const overlap = (p1.radius + p2.radius) - dist + 2;
+                const separationForce = overlap * 0.6;
                 p1.x += nx * separationForce * (mass2 / (mass1 + mass2));
                 p1.y += ny * separationForce * (mass2 / (mass1 + mass2));
                 p2.x -= nx * separationForce * (mass1 / (mass1 + mass2));
@@ -1420,7 +1436,7 @@
             }, 100);
         }
 
-        // MODIFICAR: Función de renderizado para usar personajes únicos
+        // MODIFICAR: Función de renderizado para usar imágenes de powerups
         function render() {
             // Clear canvas
             ctx.fillStyle = '#2d3748';
@@ -1484,37 +1500,62 @@
                     ctx.globalAlpha = 1.0;
                 }
                 
-                // MODIFICAR: Seleccionar imagen base según el personaje del jugador
-                let sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
+                // MODIFICAR: Seleccionar imagen según powerup o personaje base
+                let sumoImage;
                 
-                // Los powerups solo cambian el efecto visual, no la imagen base
-                let hasSpecialEffect = false;
-                if (player.powerup === 'STRENGTH') {
-                    hasSpecialEffect = true;
-                    // Mantener imagen base pero agregar efectos
-                } else if (player.powerup === 'SPEED') {
-                    hasSpecialEffect = true;
-                    // Mantener imagen base pero agregar efectos
-                } else if (player.powerup === 'SHIELD') {
-                    hasSpecialEffect = true;
-                    // Mantener imagen base pero agregar efectos
+                if (player.powerup) {
+                    // Si tiene powerup, usar la imagen específica del powerup
+                    switch (player.powerup) {
+                        case 'STRENGTH':
+                            sumoImage = sumoImages.strength;
+                            break;
+                        case 'SPEED':
+                            sumoImage = sumoImages.speed;
+                            break;
+                        case 'SHIELD':
+                            sumoImage = sumoImages.shield;
+                            break;
+                        default:
+                            // Para MAGNET o cualquier otro powerup, usar imagen base del personaje
+                            sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
+                    }
+                } else {
+                    // Sin powerup, usar imagen base del personaje
+                    sumoImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
                 }
                 
-                // Dibujar sombra para el efecto de glow
-                ctx.shadowColor = player.color;
-                ctx.shadowBlur = player.radius / 2;
+                // Asegurar que la imagen existe, si no usar default
+                if (!sumoImage || !sumoImage.complete) {
+                    sumoImage = sumoImages.character1;
+                }
                 
-                // AÑADIR: Efecto especial para powerups
-                if (hasSpecialEffect) {
-                    ctx.shadowBlur = player.radius;
-                    if (player.powerup === 'STRENGTH') {
-                        ctx.shadowColor = '#ff4444';
-                    } else if (player.powerup === 'SPEED') {
-                        ctx.shadowColor = '#44ff44';
-                    } else if (player.powerup === 'SHIELD') {
-                        ctx.shadowColor = '#4444ff';
+                // MODIFICAR: Efectos visuales mejorados para powerups
+                let glowIntensity = player.radius / 2;
+                let glowColor = player.color;
+                
+                if (player.powerup) {
+                    glowIntensity = player.radius * 1.2;
+                    switch (player.powerup) {
+                        case 'STRENGTH':
+                            glowColor = '#ff4444';
+                            break;
+                        case 'SPEED':
+                            glowColor = '#44ff44';
+                            break;
+                        case 'SHIELD':
+                            glowColor = '#4444ff';
+                            break;
+                        case 'MAGNET':
+                            glowColor = '#ff44ff';
+                            break;
+                        default:
+                            glowColor = player.color;
                     }
                 }
+                
+                // Dibujar sombra/glow
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = glowIntensity;
                 
                 // Guardar contexto antes de rotar
                 ctx.save();
@@ -1525,21 +1566,93 @@
                 // Rotar según la dirección de movimiento
                 ctx.rotate(player.rotation);
                 
-                // Dibujar la imagen del sumo escalada según el radio del jugador
-                const size = player.radius * 2.2;
+                // AÑADIR: Efecto de pulsación para powerups
+                let sizeMultiplier = 2.2;
+                if (player.powerup) {
+                    // Crear efecto de pulsación basado en el tiempo
+                    const pulseTime = Date.now() * 0.005;
+                    sizeMultiplier = 2.2 + Math.sin(pulseTime) * 0.1;
+                }
+                
+                // Dibujar la imagen del sumo
+                const size = player.radius * sizeMultiplier;
                 ctx.drawImage(sumoImage, -size/2, -size/2, size, size);
                 
                 // Restaurar contexto
                 ctx.restore();
                 ctx.shadowBlur = 0;
                 
-                // Si tiene escudo, dibujar círculo alrededor
+                // MODIFICAR: Efectos adicionales para powerups específicos
                 if (player.powerup === 'SHIELD') {
+                    // Dibujar escudo protector animado
+                    const shieldTime = Date.now() * 0.003;
                     ctx.strokeStyle = '#4444ff';
                     ctx.lineWidth = 4;
+                    ctx.globalAlpha = 0.7 + Math.sin(shieldTime) * 0.3;
                     ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius + 8, 0, Math.PI * 2);
+                    ctx.arc(player.x, player.y, player.radius + 8 + Math.sin(shieldTime) * 2, 0, Math.PI * 2);
                     ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                if (player.powerup === 'SPEED') {
+                    // Dibujar líneas de velocidad
+                    const speedLines = 6;
+                    ctx.strokeStyle = '#44ff44';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.6;
+                    
+                    for (let i = 0; i < speedLines; i++) {
+                        const angle = (Math.PI * 2 * i) / speedLines + Date.now() * 0.01;
+                        const lineLength = player.radius + 15;
+                        const startX = player.x + Math.cos(angle) * player.radius;
+                        const startY = player.y + Math.sin(angle) * player.radius;
+                        const endX = player.x + Math.cos(angle) * lineLength;
+                        const endY = player.y + Math.sin(angle) * lineLength;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                if (player.powerup === 'STRENGTH') {
+                    // Dibujar partículas de fuerza
+                    const strengthTime = Date.now() * 0.008;
+                    const particles = 8;
+                    ctx.fillStyle = '#ff4444';
+                    ctx.globalAlpha = 0.8;
+                    
+                    for (let i = 0; i < particles; i++) {
+                        const angle = (Math.PI * 2 * i) / particles + strengthTime;
+                        const distance = player.radius + 12 + Math.sin(strengthTime + i) * 8;
+                        const particleX = player.x + Math.cos(angle) * distance;
+                        const particleY = player.y + Math.sin(angle) * distance;
+                        const particleSize = 3 + Math.sin(strengthTime * 2 + i) * 2;
+                        
+                        ctx.beginPath();
+                        ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                if (player.powerup === 'MAGNET') {
+                    // Dibujar ondas magnéticas
+                    const magnetTime = Date.now() * 0.004;
+                    ctx.strokeStyle = '#ff44ff';
+                    ctx.lineWidth = 2;
+                    
+                    for (let i = 1; i <= 3; i++) {
+                        ctx.globalAlpha = 0.5 - (i * 0.1);
+                        const waveRadius = player.radius + (i * 15) + Math.sin(magnetTime + i) * 5;
+                        ctx.beginPath();
+                        ctx.arc(player.x, player.y, waveRadius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1.0;
                 }
                 
                 // Show danger indicator when near edge
@@ -1563,11 +1676,44 @@
                 ctx.strokeText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
                 ctx.fillText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
                 
-                // Powerup indicator
+                // MODIFICAR: Powerup indicator mejorado
                 if (player.powerup) {
                     const type = POWERUP_TYPES[player.powerup];
+                    
+                    // Fondo del indicador
+                    ctx.fillStyle = type.color;
+                    ctx.globalAlpha = 0.8;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y - player.radius - 15, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    
+                    // Emoji del powerup
                     ctx.font = '16px Arial';
+                    ctx.fillStyle = 'white';
                     ctx.fillText(type.emoji, player.x, player.y - player.radius - 10);
+                    
+                    // Barra de tiempo restante
+                    if (player.powerupEndTime) {
+                        const remainingTime = Math.max(0, player.powerupEndTime - Date.now());
+                        const totalTime = type.duration;
+                        const timePercent = remainingTime / totalTime;
+                        
+                        if (timePercent > 0) {
+                            const barWidth = 30;
+                            const barHeight = 4;
+                            const barX = player.x - barWidth / 2;
+                            const barY = player.y - player.radius - 30;
+                            
+                            // Fondo de la barra
+                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                            ctx.fillRect(barX, barY, barWidth, barHeight);
+                            
+                            // Barra de progreso
+                            ctx.fillStyle = type.color;
+                            ctx.fillRect(barX, barY, barWidth * timePercent, barHeight);
+                        }
+                    }
                 }
                 
                 // Player is you indicator
@@ -1579,11 +1725,11 @@
                     ctx.stroke();
                 }
                 
-                // AÑADIR: Mostrar número de personaje para debug
+                // Mostrar número de personaje para debug
                 if (GAME_CONFIG.testMode) {
                     ctx.fillStyle = '#FFD700';
                     ctx.font = 'bold 10px Arial';
-                    ctx.fillText(`P${player.characterIndex}`, player.x, player.y - player.radius - 25);
+                    ctx.fillText(`P${player.characterIndex}`, player.x, player.y - player.radius - 35);
                 }
             });
             
@@ -1608,20 +1754,33 @@
                 const alivePlayers = getAlivePlayers();
                 let timerText = `${gameState.gameTime}s`;
                 
+                // Mostrar información de jugadores vivos
+                timerText += ` (${alivePlayers.length} alive)`;
+                
+                // AÑADIR: Indicador especial cuando queda un solo jugador
+                if (alivePlayers.length === 1) {
+                    timerText += ' 🏆 WINNER!';
+                }
+                
                 // En modo de prueba, mostrar información adicional
                 if (GAME_CONFIG.testMode) {
-                    timerText += ` (${alivePlayers.length} alive)`;
-                    if (GAME_CONFIG.minPlayers === 1 && alivePlayers.length === 1) {
+                    if (alivePlayers.length === 1) {
+                        timerText += ' [TEST MODE - SUCCESS]';
+                    } else {
                         timerText += ' [TEST MODE]';
                     }
-                } else {
-                    timerText += ` (${alivePlayers.length} alive)`;
                 }
                 
                 document.getElementById('gameTimer').textContent = timerText;
             } else if (gameState.gamePhase === 'waiting') {
-                // AÑADIR: Mostrar que pueden moverse en sala de espera
                 document.getElementById('gameTimer').textContent = 'Waiting... (Use WASD to move)';
+            } else if (gameState.gamePhase === 'finished') {
+                const alivePlayers = getAlivePlayers();
+                if (alivePlayers.length === 1) {
+                    document.getElementById('gameTimer').textContent = `🏆 Winner: ${alivePlayers[0].address.substring(0, 8)}...`;
+                } else {
+                    document.getElementById('gameTimer').textContent = 'Game Finished';
+                }
             } else {
                 document.getElementById('gameTimer').textContent = 'Waiting...';
             }
@@ -1633,11 +1792,22 @@
                 const card = document.createElement('div');
                 card.className = 'player-card';
                 card.style.opacity = player.alive ? '1.0' : '0.5'; // Dim eliminated players
+                
+                // AÑADIR: Destacar al ganador
+                if (player.alive && getAlivePlayers().length === 1 && gameState.gamePhase === 'playing') {
+                    card.style.border = '2px solid #FFD700';
+                    card.style.background = 'rgba(255, 215, 0, 0.2)';
+                }
+                
+                // MODIFICAR: Mostrar información del tamaño
+                const sizeInfo = `(Size: ${player.radius.toFixed(0)})`;
+                
                 card.innerHTML = `
                     <div style="color: ${player.color}">●</div>
                     <div>${player.address.substring(0, 6)}...</div>
                     <div>${player.bet.toFixed(3)} FLOW</div>
-                    <div>${player.alive ? '🟢' : '💀'}</div>
+                    <div style="font-size: 10px; color: #ccc;">${sizeInfo}</div>
+                    <div>${player.alive ? (getAlivePlayers().length === 1 && gameState.gamePhase === 'playing' ? '👑' : '🟢') : '💀'}</div>
                 `;
                 playerList.appendChild(card);
             });
