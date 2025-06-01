@@ -1,224 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Sumo - Fight for ETH</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden; /* Previene el scroll en el body */
-            padding: 20px; /* Espacio alrededor del contenedor del juego */
-        }
-        
-        .game-container {
-            text-align: center;
-            max-width: 800px;
-            width: 100%;
-            padding: 20px; /* Padding interno para el contenido del contenedor */
-            background: rgba(0,0,0,0.2); /* Fondo sutil para ver los límites */
-            border-radius: 15px;
-            max-height: calc(100vh - 40px); /* Altura máxima = alto de ventana - padding vertical del body */
-            overflow-y: auto; /* Permite scroll vertical interno si el contenido excede max-height */
-            display: flex;
-            flex-direction: column; /* Apila los hijos verticalmente */
-        }
-        
-        h1 {
-            font-size: 2.5rem; /* Adjusted font size */
-            margin-bottom: 15px; /* Adjusted margin */
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            display: flex; /* For aligning logo and text */
-            align-items: center; /* Vertically align logo and text */
-            justify-content: center; /* Center content */
-        }
-
-        h1 img.logo {
-            height: 45px; /* Adjust logo size as needed */
-            margin-right: 10px; /* Space between logo and text */
-        }
-        
-        h1 span.title-text {
-            background: linear-gradient(45deg, #FFD700, #FFA500);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .game-info {
-            display: flex;
-            justify-content: space-around; /* Distribuye el espacio */
-            margin-bottom: 15px; /* Adjusted margin */
-            padding: 0 5px;  /* Adjusted padding */
-            width: 100%;
-        }
-        
-        .wallet-info, .game-stats {
-            background: rgba(255,255,255,0.1);
-            padding: 10px; /* Adjusted padding */
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-            flex-basis: 48%; /* Adjusted flex-basis */
-            min-width: 150px; /* Adjusted min-width */
-        }
-
-        .wallet-info h3, .game-stats h3 {
-            font-size: 1.1rem; /* Smaller heading */
-            margin-bottom: 5px;
-        }
-
-        .wallet-info p, .game-stats p {
-            font-size: 0.85rem; /* Smaller text */
-            margin-bottom: 4px;
-        }
-        
-        #gameCanvas {
-            border: 5px solid #FFD700;
-            border-radius: 50%;
-            background: radial-gradient(circle, #4a5568 0%, #2d3748 100%);
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
-            margin: 20px auto; /* Centra el canvas */
-            display: block;
-            /* width y height se establecen en los atributos HTML (600x600) */
-            max-width: 100%; /* Asegura que el canvas no desborde su contenedor si es muy estrecho */
-        }
-        
-        .controls {
-            margin: 15px 0; /* Adjusted margin */
-            width: 100%; /* Asegura que los controles usen el ancho completo para centrar su contenido */
-        }
-        
-        .btn {
-            background: linear-gradient(45deg, #FFD700, #FFA500);
-            border: none;
-            padding: 10px 20px; /* Adjusted padding */
-            margin: 5px;
-            border-radius: 25px;
-            color: #333;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.9rem; /* Adjusted font size */
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        input {
-            padding: 8px; /* Adjusted padding */
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
-            background: rgba(255,255,255,0.9);
-            color: #333;
-            font-size: 0.9rem; /* Adjusted font size */
-        }
-        
-        .instructions {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .player-list {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin: 20px 0;
-            flex-wrap: wrap;
-        }
-        
-        .player-card {
-            background: rgba(255,255,255,0.1);
-            padding: 10px 15px;
-            border-radius: 8px;
-            min-width: 120px;
-        }
-        
-        .countdown {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #FFD700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .powerup-indicator {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-
-        h1 img.logo {
-            height: 80px; /* Cambiar de 45px a un valor más grande */
-            margin-right: 10px; /* Space between logo and text */
-        }
-    </style>
-    <!-- Reemplazar Viem con ethers.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js" type="application/javascript"></script>
-    <!-- Import contract ABI -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crypto Sumo - Fight for FLOW</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js"
+      type="application/javascript"
+    ></script>
     <script src="./js/sumoContract.js"></script>
     <script src="./js/websocket-client.js"></script>
-</head>
-<body>
+  </head>
+  <body>
     <div class="game-container">
-        <h1>
-            <img src="./public/logo.png" alt="Crypto Sumo Logo" class="logo">
-        </h1>
-        
-        <div class="game-info">
-            <div class="wallet-info">
-                <h3>💰 Wallet</h3>
-                <p id="walletAddress">Not Connected</p>
-                <div class="wallet-buttons">
-                    <button class="btn" id="connectWallet">Connect Wallet</button>
-                    <button class="btn" id="disconnectWallet" style="display:none; background: linear-gradient(45deg, #ff6b6b, #ff8e8e);">Disconnect</button>
-                </div>
-                <p id="networkStatus" style="font-size: 12px; margin-top: 5px;"></p>
-            </div>
-            <div class="game-stats">
-                <h3>🏆 Game Stats</h3>
-                <p>Prize Pool: <span id="prizePool">0</span> FLOW</p>
-                <p>Players: <span id="playerCount">0</span></p>
-                <p class="countdown" id="gameTimer"></p>
-            </div>
+      <h1>
+        <img src="./public/logo.png" alt="Crypto Sumo Logo" class="logo" />
+      </h1>
+
+      <div class="game-info">
+        <div class="wallet-info">
+          <h3>💰 Wallet</h3>
+          <p id="walletAddress">Not Connected</p>
+          <div class="wallet-buttons">
+            <button class="btn" id="connectWallet">Connect Wallet</button>
+            <button
+              class="btn"
+              id="disconnectWallet"
+              style="
+                display: none;
+                background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+              "
+            >
+              Disconnect
+            </button>
+          </div>
+          <p id="networkStatus" style="font-size: 12px; margin-top: 5px"></p>
         </div>
-        
-        <div class="controls">
-            <input type="number" id="betAmount" placeholder="Bet (FLOW)" step="0.001" min="0.001" value="0.01" style="width: 120px;">
-            <button class="btn" id="joinGame">Join Game</button>
-            <button class="btn" id="startGame" style="display:none;">Start Game</button>
+        <div class="game-stats">
+          <h3>🏆 Game Stats</h3>
+          <p>Prize Pool: <span id="prizePool">0</span> FLOW</p>
+          <p>Players: <span id="playerCount">0</span></p>
+          <p class="countdown" id="gameTimer"></p>
         </div>
-        
-        <div class="player-list" id="playerList"></div>
-        
-        <canvas id="gameCanvas" width="600" height="600"></canvas>
-        <!-- 
+      </div>
+
+      <div class="controls">
+        <input
+          type="number"
+          id="betAmount"
+          placeholder="Bet (FLOW)"
+          step="0.001"
+          min="0.001"
+          value="0.01"
+          style="width: 120px"
+        />
+        <button class="btn" id="joinGame">Join Game</button>
+        <button class="btn" id="startGame" style="display: none">
+          Start Game
+        </button>
+      </div>
+
+      <div class="player-list" id="playerList"></div>
+
+      <canvas id="gameCanvas" width="600" height="600"></canvas>
+      <!-- 
         <div class="instructions">
             <h3>🎮 How to Play</h3>
             <p><strong>WASD or Arrow Keys</strong> to move your sumo wrestler</p>
@@ -228,307 +74,504 @@
             <p>🏆 <strong>Last player standing wins the entire prize pool!</strong></p>
         </div>
         -->
-        
     </div>
 
     <script>
-        // Flow Testnet Network Configuration
-        const FLOW_TESTNET = {
-            chainId: '0x221', // 545 in decimal
-            chainName: 'Flow Testnet',
-            rpcUrls: ['https://testnet.evm.nodes.onflow.org'],
-            nativeCurrency: {
-                name: 'FLOW',
-                symbol: 'FLOW',
-                decimals: 18
-            },
-            blockExplorerUrls: ['https://testnet.flowscan.org']
-        };
+      // Flow Testnet Network Configuration
+      const FLOW_TESTNET = {
+        chainId: "0x221", // 545 in decimal
+        chainName: "Flow Testnet",
+        rpcUrls: ["https://testnet.evm.nodes.onflow.org"],
+        nativeCurrency: {
+          name: "FLOW",
+          symbol: "FLOW",
+          decimals: 18,
+        },
+        blockExplorerUrls: ["https://testnet.flowscan.org"],
+      };
 
-        // Configuración del juego (AÑADIR ESTA SECCIÓN)
-        const GAME_CONFIG = {
-            minPlayers: 1,     // Cambiar a 2 para el modo normal
-            testMode: true,    // Activa características de prueba
-            gameTime: 60       // Duración de la partida en segundos
-        };
+      // Configuración del juego (AÑADIR ESTA SECCIÓN)
+      const GAME_CONFIG = {
+        minPlayers: 1, // Cambiar a 2 para el modo normal
+        testMode: true, // Activa características de prueba
+        gameTime: 60, // Duración de la partida en segundos
+      };
 
-        // Game State
-        let gameState = {
-            players: new Map(),
-            powerups: [],
-            gameRunning: false,
-            gamePhase: 'waiting', // waiting, countdown, playing, finished
-            prizePool: 0,
-            myPlayerId: null,
-            countdown: 0,
-            gameTime: 60
-        };
+      // Game State
+      let gameState = {
+        players: new Map(),
+        powerups: [],
+        gameRunning: false,
+        gamePhase: "waiting", // waiting, countdown, playing, finished
+        prizePool: 0,
+        myPlayerId: null,
+        countdown: 0,
+        gameTime: 60,
+      };
 
-        // Canvas setup
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const ringRadius = 280;
+      // Canvas setup
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const ringRadius = 280;
 
-        // Wallet connection
-        let walletConnected = false;
-        let walletAddress = '';
+      // Wallet connection
+      let walletConnected = false;
+      let walletAddress = "";
 
-        // Game mechanics
-        const POWERUP_TYPES = {
-            STRENGTH: { emoji: '💪', color: '#ff4444', duration: 5000 },
-            SPEED: { emoji: '⚡', color: '#44ff44', duration: 5000 },
-            SHIELD: { emoji: '🛡️', color: '#4444ff', duration: 3000 },
-            MAGNET: { emoji: '🧲', color: '#ff44ff', duration: 4000 }
-        };
+      // Game mechanics
+      const POWERUP_TYPES = {
+        STRENGTH: { emoji: "💪", color: "#ff4444", duration: 5000 },
+        SPEED: { emoji: "⚡", color: "#44ff44", duration: 5000 },
+        SHIELD: { emoji: "🛡️", color: "#4444ff", duration: 3000 },
+        MAGNET: { emoji: "🧲", color: "#ff44ff", duration: 4000 },
+      };
 
-        // Ethers.js variables para Ethereum
-        let provider;
-        let signer;
+      // Ethers.js variables para Ethereum
+      let provider;
+      let signer;
 
-        // Precargar imágenes de sumo
-        const sumoImages = {
-            default: new Image(),
-            // MODIFICAR: Imágenes específicas de powerups como overlays
-            strengthOverlay: new Image(),
-            speedOverlay: new Image(),
-            shieldOverlay: new Image(),
-            magnetOverlay: new Image(), // Para cuando agregues la imagen
-            // Imágenes de personajes únicos
-            character1: new Image(),
-            character2: new Image(),
-            character3: new Image(),
-            character4: new Image()
-        };
+      // Precargar imágenes de sumo
+      const sumoImages = {
+        default: new Image(),
+        // MODIFICAR: Imágenes específicas de powerups como overlays
+        strengthOverlay: new Image(),
+        speedOverlay: new Image(),
+        shieldOverlay: new Image(),
+        magnetOverlay: new Image(), // Para cuando agregues la imagen
+        // Imágenes de personajes únicos
+        character1: new Image(),
+        character2: new Image(),
+        character3: new Image(),
+        character4: new Image(),
+      };
 
-        // AÑADIR: Control de personajes asignados
-        const assignedCharacters = new Set();
-        let nextCharacterIndex = 1;
+      // AÑADIR: Control de personajes asignados
+      const assignedCharacters = new Set();
+      let nextCharacterIndex = 1;
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSumoImages();
-            setupEthers();
-            setupEventListeners();
-            
-            // Iniciar conexión WebSocket
-            gameConnection = new GameConnection();
-            
-            // Configurar callbacks de WebSocket
-            gameConnection.setCallback('onConnect', () => {
-                showMessage('Conectado al servidor del juego');
-            });
-            
-            gameConnection.setCallback('onDisconnect', () => {
-                showMessage('Desconectado del servidor del juego');
-            });
-            
-            gameConnection.setCallback('onGameState', (newState) => {
-                updateGameStateFromServer(newState);
-            });
-            
-            gameConnection.setCallback('onError', (error) => {
-                console.error('Error de conexión:', error);
-                showMessage('Error de conexión con el servidor');
-            });
-            
-            // Conectar al servidor
-            gameConnection.connect();
-            
-            // Iniciar bucle de renderizado local
-            gameLoop();
-            
-            // En modo offline, añadir jugadores demo
-            setTimeout(() => {
-                if (gameState.players.size === 0 && !gameConnection.connected) {
-                    addDemoPlayers();
-                }
-            }, 2000);
+      // Initialize
+      document.addEventListener("DOMContentLoaded", function () {
+        loadSumoImages();
+        setupEthers();
+        setupEventListeners();
+
+        // Iniciar conexión WebSocket
+        gameConnection = new GameConnection();
+
+        // Configurar callbacks de WebSocket
+        gameConnection.setCallback("onConnect", () => {
+          showMessage("Conectado al servidor del juego");
         });
 
-        // Cargar imágenes de sumos
-        function loadSumoImages() {
-            // MODIFICAR: Cargar imágenes específicas de powerups como overlays
-            sumoImages.default.src = './public/sumo-default.png';
-            sumoImages.strengthOverlay.src = './public/sumo_strength.PNG';
-            sumoImages.speedOverlay.src = './public/sumo_speed.PNG';
-            sumoImages.shieldOverlay.src = './public/sumo_shield.PNG';
-            // sumoImages.magnetOverlay.src = './public/sumo_magnet.PNG'; // Descomenta cuando tengas la imagen
+        gameConnection.setCallback("onDisconnect", () => {
+          showMessage("Desconectado del servidor del juego");
+        });
+
+        gameConnection.setCallback("onGameState", (newState) => {
+          updateGameStateFromServer(newState);
+        });
+
+        gameConnection.setCallback("onError", (error) => {
+          console.error("Error de conexión:", error);
+          showMessage("Error de conexión con el servidor");
+        });
+
+        // Conectar al servidor
+        gameConnection.connect();
+
+        // Iniciar bucle de renderizado local
+        gameLoop();
+
+        // En modo offline, añadir jugadores demo
+        setTimeout(() => {
+          if (gameState.players.size === 0 && !gameConnection.connected) {
+            addDemoPlayers();
+          }
+        }, 2000);
+      });
+
+      // Cargar imágenes de sumos
+      function loadSumoImages() {
+        // MODIFICAR: Cargar imágenes específicas de powerups como overlays
+        sumoImages.default.src = "./public/sumo-default.png";
+        sumoImages.strengthOverlay.src = "./public/sumo_strength.PNG";
+        sumoImages.speedOverlay.src = "./public/sumo_speed.PNG";
+        sumoImages.shieldOverlay.src = "./public/sumo_shield.PNG";
+        // sumoImages.magnetOverlay.src = './public/sumo_magnet.PNG'; // Descomenta cuando tengas la imagen
+
+        // MANTENER: Cargar imágenes de personajes únicos
+        sumoImages.character1.src = "./public/sumo_one.PNG";
+        sumoImages.character2.src = "./public/sumo_two.PNG";
+        sumoImages.character3.src = "./public/sumo_three.PNG";
+        sumoImages.character4.src = "./public/sumo_four.PNG";
+
+        // Añadir evento de carga para mostrar progreso
+        let imagesLoaded = 0;
+        const totalImages = Object.keys(sumoImages).length;
+
+        Object.values(sumoImages).forEach((img) => {
+          img.onload = () => {
+            imagesLoaded++;
+            console.log(`Cargando imágenes: ${imagesLoaded}/${totalImages}`);
+          };
+
+          img.onerror = (err) => {
+            console.error("Error cargando imagen:", err);
+          };
+        });
+      }
+
+      // Configuración de ethers.js para interactuar con Ethereum
+      function setupEthers() {
+        try {
+          // Verificar si MetaMask está instalado
+          if (window.ethereum) {
+            // Crear provider usando el proveedor de la ventana (MetaMask) - Sintaxis Ethers v6
+            provider = new ethers.BrowserProvider(window.ethereum);
+            console.log("Ethers.js initialized with BrowserProvider (v6)");
+          } else {
+            console.log("No Ethereum wallet detected"); // Este mensaje es correcto si no hay wallet
+          }
+        } catch (error) {
+          console.error("Error setting up ethers:", error);
+        }
+      }
+
+      function setupEventListeners() {
+        document
+          .getElementById("connectWallet")
+          .addEventListener("click", connectWallet);
+        document
+          .getElementById("disconnectWallet")
+          .addEventListener("click", disconnectWallet);
+        document.getElementById("joinGame").addEventListener("click", joinGame);
+        document
+          .getElementById("startGame")
+          .addEventListener("click", startGame);
+
+        // Keyboard controls
+        document.addEventListener("keydown", handleKeyDown);
+        document.addEventListener("keyup", handleKeyUp);
+      }
+
+      // Wallet functions con ethers.js
+      async function connectWallet() {
+        try {
+          if (!window.ethereum) {
+            alert(
+              "MetaMask or other Ethereum wallet not found! Please install MetaMask."
+            );
+            simulateWalletConnection();
+            return;
+          }
+
+          // Request accounts first to ensure we're connected
+          const accounts = await window.ethereum.request({
+            method: "eth_requestAccounts",
+          });
+          if (!accounts || accounts.length === 0) {
+            alert("No accounts found or permission denied.");
+            simulateWalletConnection();
+            return;
+          }
+
+          // Show network status in UI
+          document.getElementById("networkStatus").textContent =
+            "Checking network...";
+
+          // Check if we're on the correct network
+          const chainId = await window.ethereum.request({
+            method: "eth_chainId",
+          });
+          if (chainId !== FLOW_TESTNET.chainId) {
+            // Wrong network, prompt to switch
+            document.getElementById("networkStatus").textContent =
+              "Switching to Flow Testnet...";
+            showMessage("Attempting to switch to Flow Testnet...");
+
+            try {
+              const switched = await switchToFlowTestnet();
+              if (!switched) {
+                document.getElementById("networkStatus").textContent =
+                  "Please add Flow network manually";
+                showManualNetworkInstructions();
+                return;
+              }
+            } catch (switchError) {
+              console.error("Switch error:", switchError);
+              document.getElementById("networkStatus").textContent =
+                "Network switch failed";
+              showManualNetworkInstructions();
+              return;
+            }
+          }
+
+          // Crear provider si no existe
+          if (!provider) {
+            provider = new ethers.BrowserProvider(window.ethereum);
+          }
+
+          // Obtener el signer
+          signer = await provider.getSigner();
+          walletAddress = await signer.getAddress();
+          walletConnected = true;
+
+          // Actualizar UI
+          document.getElementById("walletAddress").textContent =
+            walletAddress.substring(0, 6) + "..." + walletAddress.substring(38);
+          document.getElementById("connectWallet").style.display = "none";
+          document.getElementById("disconnectWallet").style.display =
+            "inline-block";
+          document.getElementById("networkStatus").textContent =
+            "Connected to Flow Testnet";
+
+          // Configurar eventos para cambios en la wallet
+          setupWalletEvents();
+
+          // Obtener saldo
+          const balance = await provider.getBalance(walletAddress);
+          const etherBalance = ethers.formatEther(balance);
+
+          console.log("Wallet connected:", walletAddress);
+          console.log("Balance:", etherBalance, "FLOW");
+
+          showMessage(`Wallet connected: ${etherBalance} FLOW`);
+
+          // AÑADIR: Verificar si el jugador ya está en el juego
+          await checkIfPlayerAlreadyInGame();
+
+        } catch (error) {
+          console.error("Error connecting wallet:", error);
+          alert(`Error connecting wallet: ${error.message || error}`);
+          document.getElementById("networkStatus").textContent =
+            "Connection failed";
+          simulateWalletConnection();
+        }
+      }
+
+      // AÑADIR: Nueva función para verificar si el jugador ya está en el juego
+      async function checkIfPlayerAlreadyInGame() {
+        try {
+          if (!signer || !walletConnected) {
+            console.log("No signer available, skipping game check");
+            return;
+          }
+
+          // Crear instancia del contrato
+          const contractAddress = "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489";
+          const contract = new ethers.Contract(
+            contractAddress,
+            SUMO_CONTRACT_ABI,
+            signer
+          );
+
+          console.log("Checking if player is already in game...");
+
+          // Obtener la lista de jugadores activos del contrato
+          const activePlayers = await contract.getActivePlayers();
+          console.log("Active players from contract:", activePlayers);
+
+          // Verificar si mi dirección está en la lista
+          const isPlayerInGame = activePlayers.some(
+            (playerAddress) => playerAddress.toLowerCase() === walletAddress.toLowerCase()
+          );
+
+          if (isPlayerInGame) {
+            console.log("Player is already in the game, auto-joining...");
             
-            // MANTENER: Cargar imágenes de personajes únicos
-            sumoImages.character1.src = './public/sumo_one.PNG';
-            sumoImages.character2.src = './public/sumo_two.PNG';
-            sumoImages.character3.src = './public/sumo_three.PNG';
-            sumoImages.character4.src = './public/sumo_four.PNG';
+            // Obtener información del jugador del contrato
+            const playerInfo = await contract.getPlayerInfo(walletAddress);
+            console.log("Player info from contract:", playerInfo);
+
+            const stakingAmount = ethers.formatEther(playerInfo.stakingAmount);
+            console.log("Player staking amount:", stakingAmount, "FLOW");
+
+            // Obtener estado del juego
+            const isGameActive = await contract.getGameState();
+            console.log("Game state from contract:", isGameActive);
+
+            // Crear el jugador localmente con la información del contrato
+            const playerId = walletAddress;
+            gameState.myPlayerId = playerId;
+
+            // Asignar personaje único
+            const characterIndex = getNextAvailableCharacter();
+
+            const player = {
+              id: playerId,
+              address: walletAddress,
+              bet: parseFloat(stakingAmount),
+              x: centerX + (Math.random() - 0.5) * 200,
+              y: centerY + (Math.random() - 0.5) * 200,
+              vx: 0,
+              vy: 0,
+              radius: calculatePlayerSize(parseFloat(stakingAmount)),
+              color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+              alive: true,
+              powerup: null,
+              powerupEndTime: 0,
+              keys: {},
+              rotation: Math.random() * Math.PI * 2,
+              rotationSpeed: 0,
+              characterIndex: characterIndex,
+            };
+
+            gameState.players.set(playerId, player);
             
-            // Añadir evento de carga para mostrar progreso
-            let imagesLoaded = 0;
-            const totalImages = Object.keys(sumoImages).length;
-            
-            Object.values(sumoImages).forEach(img => {
-                img.onload = () => {
-                    imagesLoaded++;
-                    console.log(`Cargando imágenes: ${imagesLoaded}/${totalImages}`);
+            // Actualizar el prize pool local (obteniendo info de otros jugadores también)
+            gameState.prizePool = 0;
+            for (const playerAddress of activePlayers) {
+              const playerData = await contract.getPlayerInfo(playerAddress);
+              gameState.prizePool += parseFloat(ethers.formatEther(playerData.stakingAmount));
+            }
+
+            // Crear jugadores para otros participantes si no existen localmente
+            for (const playerAddress of activePlayers) {
+              if (playerAddress.toLowerCase() !== walletAddress.toLowerCase() && 
+                  !gameState.players.has(playerAddress)) {
+                
+                const otherPlayerInfo = await contract.getPlayerInfo(playerAddress);
+                const otherBet = parseFloat(ethers.formatEther(otherPlayerInfo.stakingAmount));
+                const otherCharacterIndex = getNextAvailableCharacter();
+
+                const otherPlayer = {
+                  id: playerAddress,
+                  address: playerAddress,
+                  bet: otherBet,
+                  x: centerX + (Math.random() - 0.5) * 200,
+                  y: centerY + (Math.random() - 0.5) * 200,
+                  vx: 0,
+                  vy: 0,
+                  radius: calculatePlayerSize(otherBet),
+                  color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                  alive: true,
+                  powerup: null,
+                  powerupEndTime: 0,
+                  keys: {},
+                  isAI: false, // Marcar como jugadores reales
+                  rotation: Math.random() * Math.PI * 2,
+                  rotationSpeed: 0,
+                  characterIndex: otherCharacterIndex,
                 };
-                
-                img.onerror = (err) => {
-                    console.error('Error cargando imagen:', err);
-                };
-            });
-        }
 
-        // Configuración de ethers.js para interactuar con Ethereum
-        function setupEthers() {
-            try {
-                // Verificar si MetaMask está instalado
-                if (window.ethereum) {
-                    // Crear provider usando el proveedor de la ventana (MetaMask) - Sintaxis Ethers v6
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                    console.log("Ethers.js initialized with BrowserProvider (v6)");
-                } else {
-                    console.log("No Ethereum wallet detected"); // Este mensaje es correcto si no hay wallet
-                }
-            } catch (error) {
-                console.error("Error setting up ethers:", error);
+                gameState.players.set(playerAddress, otherPlayer);
+              }
             }
-        }
 
-        function setupEventListeners() {
-            document.getElementById('connectWallet').addEventListener('click', connectWallet);
-            document.getElementById('disconnectWallet').addEventListener('click', disconnectWallet);
-            document.getElementById('joinGame').addEventListener('click', joinGame);
-            document.getElementById('startGame').addEventListener('click', startGame);
+            // Actualizar estado del juego según el contrato
+            if (isGameActive) {
+              gameState.gameRunning = true;
+              gameState.gamePhase = "playing";
+              // Iniciar timer local si el juego está activo
+              startGameTimer();
+            } else {
+              gameState.gamePhase = "waiting";
+            }
+
+            // Actualizar UI
+            updateUI();
+
+            // Actualizar estado de los botones
+            document.getElementById("joinGame").disabled = true;
+            document.getElementById("joinGame").textContent = "Already Joined ✓";
+
+            // Mostrar botón de start si corresponde y no está el juego activo
+            if (!isGameActive && activePlayers.length >= GAME_CONFIG.minPlayers) {
+              document.getElementById("startGame").style.display = "inline-block";
+            }
+
+            // Conectar al WebSocket si está disponible
+            if (gameConnection.connected) {
+              gameConnection.joinExistingGame(walletAddress, parseFloat(stakingAmount));
+            }
+
+            showMessage(`✅ Rejoined existing game with ${stakingAmount} FLOW!`, 4000);
             
-            // Keyboard controls
-            document.addEventListener('keydown', handleKeyDown);
-            document.addEventListener('keyup', handleKeyUp);
-        }
-
-        // Wallet functions con ethers.js
-        async function connectWallet() {
-            try {
-                if (!window.ethereum) {
-                    alert("MetaMask or other Ethereum wallet not found! Please install MetaMask.");
-                    simulateWalletConnection();
-                    return;
-                }
-                
-                // Request accounts first to ensure we're connected
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                if (!accounts || accounts.length === 0) {
-                    alert("No accounts found or permission denied.");
-                    simulateWalletConnection();
-                    return;
-                }
-                
-                // Show network status in UI
-                document.getElementById('networkStatus').textContent = "Checking network...";
-                
-                // Check if we're on the correct network
-                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                if (chainId !== FLOW_TESTNET.chainId) {
-                    // Wrong network, prompt to switch
-                    document.getElementById('networkStatus').textContent = "Switching to Flow Testnet...";
-                    showMessage("Attempting to switch to Flow Testnet...");
-                    
-                    try {
-                        const switched = await switchToFlowTestnet();
-                        if (!switched) {
-                            document.getElementById('networkStatus').textContent = "Please add Flow network manually";
-                            showManualNetworkInstructions();
-                            return;
-                        }
-                    } catch (switchError) {
-                        console.error("Switch error:", switchError);
-                        document.getElementById('networkStatus').textContent = "Network switch failed";
-                        showManualNetworkInstructions();
-                        return;
-                    }
-                }
-
-                // Crear provider si no existe
-                if (!provider) {
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                }
-                
-                // Obtener el signer
-                signer = await provider.getSigner();
-                walletAddress = await signer.getAddress();
-                walletConnected = true;
-                
-                // Actualizar UI
-                document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
-                document.getElementById('connectWallet').style.display = 'none';
-                document.getElementById('disconnectWallet').style.display = 'inline-block';
-                document.getElementById('networkStatus').textContent = "Connected to Flow Testnet";
-                
-                // Configurar eventos para cambios en la wallet
-                setupWalletEvents();
-                
-                // Obtener saldo
-                const balance = await provider.getBalance(walletAddress);
-                const etherBalance = ethers.formatEther(balance);
-                
-                console.log("Wallet connected:", walletAddress);
-                console.log("Balance:", etherBalance, "FLOW");
-                
-                showMessage(`Wallet connected: ${etherBalance} FLOW`);
-            } catch (error) {
-                console.error("Error connecting wallet:", error);
-                alert(`Error connecting wallet: ${error.message || error}`);
-                document.getElementById('networkStatus').textContent = "Connection failed";
-                simulateWalletConnection();
+          } else {
+            console.log("Player is not in any active game");
+            
+            // Verificar si hay un juego activo sin el jugador
+            const isGameActive = await contract.getGameState();
+            if (isGameActive) {
+              showMessage("There's an active game, but you're not participating", 3000);
+              document.getElementById("joinGame").disabled = true;
+              document.getElementById("joinGame").textContent = "Game in Progress";
+            } else {
+              // No hay juego activo, permitir unirse
+              document.getElementById("joinGame").disabled = false;
+              document.getElementById("joinGame").textContent = "Join Game";
             }
+          }
+
+        } catch (error) {
+          console.error("Error checking if player is in game:", error);
+          
+          // Si hay error al comunicarse con el contrato, permitir continuar normalmente
+          if (error.message.includes("revert") || error.message.includes("call revert")) {
+            console.log("Contract call reverted, probably no active game");
+            showMessage("No active game found", 2000);
+          } else {
+            console.warn("Contract interaction failed, continuing in offline mode");
+            showMessage("Unable to verify game state, continuing offline", 3000);
+          }
+          
+          // Mantener la funcionalidad normal del juego
+          document.getElementById("joinGame").disabled = false;
+          document.getElementById("joinGame").textContent = "Join Game";
         }
-        
-        // Function to disconnect wallet
-        async function disconnectWallet() {
-            try {
-                // Reset wallet state
-                walletConnected = false;
-                walletAddress = '';
-                signer = null;
-                
-                // Update UI
-                document.getElementById('walletAddress').textContent = 'Not Connected';
-                document.getElementById('connectWallet').style.display = 'inline-block';
-                document.getElementById('disconnectWallet').style.display = 'none';
-                document.getElementById('networkStatus').textContent = '';
-                document.getElementById('joinGame').disabled = false;
-                document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
-                
-                // Note: MetaMask doesn't have a direct disconnect method from dApps
-                // We're just resetting our app's connection state
-                
-                showMessage('Wallet disconnected');
-                
-                // If player is in game, we may want to handle that
-                if (gameState.myPlayerId) {
-                    // This would depend on your game logic
-                    // Possibly remove player or mark as disconnected
-                }
-                
-            } catch (error) {
-                console.error("Error disconnecting wallet:", error);
-                showMessage('Error disconnecting wallet');
-            }
+      }
+
+      // Function to disconnect wallet
+      async function disconnectWallet() {
+        try {
+          // Reset wallet state
+          walletConnected = false;
+          walletAddress = "";
+          signer = null;
+
+          // Update UI
+          document.getElementById("walletAddress").textContent =
+            "Not Connected";
+          document.getElementById("connectWallet").style.display =
+            "inline-block";
+          document.getElementById("disconnectWallet").style.display = "none";
+          document.getElementById("networkStatus").textContent = "";
+          document.getElementById("joinGame").disabled = false;
+          document.getElementById("joinGame").textContent =
+            "Join Game (Bet FLOW)";
+
+          // Note: MetaMask doesn't have a direct disconnect method from dApps
+          // We're just resetting our app's connection state
+
+          showMessage("Wallet disconnected");
+
+          // If player is in game, we may want to handle that
+          if (gameState.myPlayerId) {
+            // This would depend on your game logic
+            // Possibly remove player or mark as disconnected
+          }
+        } catch (error) {
+          console.error("Error disconnecting wallet:", error);
+          showMessage("Error disconnecting wallet");
         }
-        
-        // Function to display manual network adding instructions
-        function showManualNetworkInstructions() {
-            const instructions = document.createElement('div');
-            instructions.style.position = 'fixed';
-            instructions.style.top = '50%';
-            instructions.style.left = '50%';
-            instructions.style.transform = 'translate(-50%, -50%)';
-            instructions.style.background = 'rgba(0,0,0,0.9)';
-            instructions.style.color = 'white';
-            instructions.style.padding = '20px';
-            instructions.style.borderRadius = '10px';
-            instructions.style.maxWidth = '400px';
-            instructions.style.zIndex = '1001';
-            instructions.innerHTML = `
+      }
+
+      // Function to display manual network adding instructions
+      function showManualNetworkInstructions() {
+        const instructions = document.createElement("div");
+        instructions.style.position = "fixed";
+        instructions.style.top = "50%";
+        instructions.style.left = "50%";
+        instructions.style.transform = "translate(-50%)";
+        instructions.style.background = "rgba(0,0,0,0.9)";
+        instructions.style.color = "white";
+        instructions.style.padding = "20px";
+        instructions.style.borderRadius = "10px";
+        instructions.style.maxWidth = "400px";
+        instructions.style.zIndex = "1001";
+        instructions.innerHTML = `
                 <h3 style="color: #FFD700;">Add Flow Network Manually</h3>
                 <p>Please add Flow Testnet to your wallet with these details:</p>
                 <ul style="text-align: left; margin: 15px 0;">
@@ -541,151 +584,503 @@
                 <button id="closeInstructions" class="btn" style="margin-top: 10px;">Close</button>
                 <button id="tryAgain" class="btn" style="margin-top: 10px; margin-left: 10px;">Try Again</button>
             `;
-            
-            document.body.appendChild(instructions);
-            
-            document.getElementById('closeInstructions').addEventListener('click', () => {
-                document.body.removeChild(instructions);
-            });
-            
-            document.getElementById('tryAgain').addEventListener('click', () => {
-                document.body.removeChild(instructions);
-                connectWallet();
-            });
+
+        document.body.appendChild(instructions);
+
+        document
+          .getElementById("closeInstructions")
+          .addEventListener("click", () => {
+            document.body.removeChild(instructions);
+          });
+
+        document.getElementById("tryAgain").addEventListener("click", () => {
+          document.body.removeChild(instructions);
+          connectWallet();
+        });
+      }
+
+      // Function to switch to Flow Testnet with improved error handling
+      async function switchToFlowTestnet() {
+        try {
+          console.log(
+            "Attempting to switch to Flow Testnet, chainId:",
+            FLOW_TESTNET.chainId
+          );
+
+          // First try to switch to the network
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: FLOW_TESTNET.chainId }],
+          });
+          console.log("Network switch successful");
+          return true;
+        } catch (switchError) {
+          console.log("Switch error:", switchError);
+          console.log("Switch error code:", switchError.code);
+
+          // This error code indicates that the chain has not been added to MetaMask
+          if (
+            switchError.code === 4902 ||
+            switchError.message.includes("wallet_addEthereumChain")
+          ) {
+            try {
+              console.log("Attempting to add Flow Testnet to wallet");
+              // Add the network to MetaMask
+              await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [
+                  {
+                    chainId: FLOW_TESTNET.chainId,
+                    chainName: FLOW_TESTNET.chainName,
+                    nativeCurrency: FLOW_TESTNET.nativeCurrency,
+                    rpcUrls: FLOW_TESTNET.rpcUrls,
+                    blockExplorerUrls: FLOW_TESTNET.blockExplorerUrls,
+                  },
+                ],
+              });
+
+              // Verify the switch was successful
+              const newChainId = await window.ethereum.request({
+                method: "eth_chainId",
+              });
+              console.log("New chain ID after add:", newChainId);
+              return newChainId === FLOW_TESTNET.chainId;
+            } catch (addError) {
+              console.error("Error adding Flow Testnet to wallet:", addError);
+              return false;
+            }
+          }
+          // Other errors
+          console.error("Error switching to Flow Testnet:", switchError);
+          return false;
         }
-        
-        // Function to switch to Flow Testnet with improved error handling
-        async function switchToFlowTestnet() {
-            try {
-                console.log("Attempting to switch to Flow Testnet, chainId:", FLOW_TESTNET.chainId);
-                
-                // First try to switch to the network
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: FLOW_TESTNET.chainId }],
-                });
-                console.log("Network switch successful");
-                return true;
-            } catch (switchError) {
-                console.log("Switch error:", switchError);
-                console.log("Switch error code:", switchError.code);
-                
-                // This error code indicates that the chain has not been added to MetaMask
-                if (switchError.code === 4902 || switchError.message.includes("wallet_addEthereumChain")) {
-                    try {
-                        console.log("Attempting to add Flow Testnet to wallet");
-                        // Add the network to MetaMask
-                        await window.ethereum.request({
-                            method: 'wallet_addEthereumChain',
-                            params: [
-                                {
-                                    chainId: FLOW_TESTNET.chainId,
-                                    chainName: FLOW_TESTNET.chainName,
-                                    nativeCurrency: FLOW_TESTNET.nativeCurrency,
-                                    rpcUrls: FLOW_TESTNET.rpcUrls,
-                                    blockExplorerUrls: FLOW_TESTNET.blockExplorerUrls
-                                }
-                            ],
-                        });
-                        
-                        // Verify the switch was successful
-                        const newChainId = await window.ethereum.request({ method: 'eth_chainId' });
-                        console.log("New chain ID after add:", newChainId);
-                        return newChainId === FLOW_TESTNET.chainId;
-                        
-                    } catch (addError) {
-                        console.error('Error adding Flow Testnet to wallet:', addError);
-                        return false;
-                    }
-                }
-                // Other errors
-                console.error('Error switching to Flow Testnet:', switchError);
-                return false;
-            }
-        }
-        
-        // Modificar setupWalletEvents para verificar la red en cambios de cadena
-        function setupWalletEvents() {
-            if (!window.ethereum) return;
-            
-            // Remover listeners anteriores para evitar duplicados
-            try {
-                window.ethereum.removeAllListeners('accountsChanged');
-                window.ethereum.removeAllListeners('chainChanged');
-            } catch (error) {
-                console.log('No previous listeners to remove');
-            }
-            
-            const handleAccountsChanged = async (accounts) => {
-                console.log('Accounts changed:', accounts);
-                if (accounts.length === 0) {
-                    // Usuario desconectó su wallet desde MetaMask
-                    disconnectWallet(); // Use our disconnect function
-                } else {
-                    // Usuario cambió de cuenta
-                    try {
-                        walletAddress = accounts[0];
-                        document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
-                        if (provider) {
-                            signer = await provider.getSigner();
-                        }
-                        showMessage('Account changed');
-                    } catch (error) {
-                        console.error('Error handling account change:', error);
-                    }
-                }
-            };
-            
-            const handleChainChanged = async (chainId) => {
-                console.log('Chain changed to:', chainId);
-                
-                // Check if new chain is Flow Testnet
-                if (chainId !== FLOW_TESTNET.chainId) {
-                    document.getElementById('networkStatus').textContent = "Wrong network";
-                    showMessage('Wrong network! Please switch to Flow Testnet', 5000);
-                    document.getElementById('joinGame').disabled = true;
-                    
-                    // Add option to switch back
-                    const switchButton = document.createElement('button');
-                    switchButton.className = 'btn';
-                    switchButton.textContent = 'Switch to Flow Testnet';
-                    switchButton.style.margin = '10px auto';
-                    switchButton.style.display = 'block';
-                    
-                    switchButton.onclick = async () => {
-                        await switchToFlowTestnet();
-                        document.body.removeChild(switchButton);
-                    };
-                    
-                    document.body.appendChild(switchButton);
-                } else {
-                    document.getElementById('networkStatus').textContent = "Connected to Flow Testnet";
-                    document.getElementById('joinGame').disabled = false;
-                    showMessage('Connected to Flow Testnet ✓');
-                }
-            };
-            
-            // Usar try-catch para manejar diferentes versiones de MetaMask
-            try {
-                if (window.ethereum.on) {
-                    window.ethereum.on('accountsChanged', handleAccountsChanged);
-                    window.ethereum.on('chainChanged', handleChainChanged);
-                } else if (window.ethereum.addEventListener) {
-                    window.ethereum.addEventListener('accountsChanged', handleAccountsChanged);
-                    window.ethereum.addEventListener('chainChanged', handleChainChanged);
-                } else {
-                    console.log('MetaMask event listeners not supported');
-                }
-            } catch (error) {
-                console.error('Error setting up wallet events:', error);
-                // Continuar sin event listeners si hay problemas
-            }
+      }
+
+      // Modificar setupWalletEvents para verificar la red en cambios de cadena
+      function setupWalletEvents() {
+        if (!window.ethereum) return;
+
+        // Remover listeners anteriores para evitar duplicados
+        try {
+          window.ethereum.removeAllListeners("accountsChanged");
+          window.ethereum.removeAllListeners("chainChanged");
+        } catch (error) {
+          console.log("No previous listeners to remove");
         }
 
-        // Game functions - Modificar joinGame para usar ethers.js
-        async function joinGame() {
-            if (!walletConnected) {
-                alert('Please connect your wallet first!');
+        const handleAccountsChanged = async (accounts) => {
+          console.log("Accounts changed:", accounts);
+          if (accounts.length === 0) {
+            // Usuario desconectó su wallet desde MetaMask
+            disconnectWallet(); // Use our disconnect function
+          } else {
+            // Usuario cambió de cuenta
+            try {
+              walletAddress = accounts[0];
+              document.getElementById("walletAddress").textContent =
+                walletAddress.substring(0, 6) +
+                "..." +
+                walletAddress.substring(38);
+              if (provider) {
+                signer = await provider.getSigner();
+              }
+              showMessage("Account changed");
+            } catch (error) {
+              console.error("Error handling account change:", error);
+            }
+          }
+        };
+
+        const handleChainChanged = async (chainId) => {
+          console.log("Chain changed to:", chainId);
+
+          // Check if new chain is Flow Testnet
+          if (chainId !== FLOW_TESTNET.chainId) {
+            document.getElementById("networkStatus").textContent =
+              "Wrong network";
+            showMessage("Wrong network! Please switch to Flow Testnet", 5000);
+            document.getElementById("joinGame").disabled = true;
+
+            // Add option to switch back
+            const switchButton = document.createElement("button");
+            switchButton.className = "btn";
+            switchButton.textContent = "Switch to Flow Testnet";
+            switchButton.style.margin = "10px auto";
+            switchButton.style.display = "block";
+
+            switchButton.onclick = async () => {
+              await switchToFlowTestnet();
+              document.body.removeChild(switchButton);
+            };
+
+            document.body.appendChild(switchButton);
+          } else {
+            document.getElementById("networkStatus").textContent =
+              "Connected to Flow Testnet";
+            document.getElementById("joinGame").disabled = false;
+            showMessage("Connected to Flow Testnet ✓");
+          }
+        };
+
+        // Usar try-catch para manejar diferentes versiones de MetaMask
+        try {
+          if (window.ethereum.on) {
+            window.ethereum.on("accountsChanged", handleAccountsChanged);
+            window.ethereum.on("chainChanged", handleChainChanged);
+          } else if (window.ethereum.addEventListener) {
+            window.ethereum.addEventListener(
+              "accountsChanged",
+              handleAccountsChanged
+            );
+            window.ethereum.addEventListener(
+              "chainChanged",
+              handleChainChanged
+            );
+          } else {
+            console.log("MetaMask event listeners not supported");
+          }
+        } catch (error) {
+          console.error("Error setting up wallet events:", error);
+          // Continuar sin event listeners si hay problemas
+        }
+      }
+
+      // Game functions - Modificar joinGame para usar ethers.js
+      async function joinGame() {
+        if (!walletConnected) {
+          alert("Please connect your wallet first!");
+          return;
+        }
+
+        try {
+          // Verificar red correcta
+          const chainId = await window.ethereum.request({
+            method: "eth_chainId",
+          });
+          if (chainId !== FLOW_TESTNET.chainId) {
+            alert("Please switch to Flow Testnet to play!");
+            const switched = await switchToFlowTestnet();
+            if (!switched) {
+              showManualNetworkInstructions();
+              return;
+            }
+          }
+
+          const betAmount = parseFloat(
+            document.getElementById("betAmount").value
+          );
+          if (betAmount < 0.001) {
+            alert("Minimum bet is 0.001 FLOW");
+            return;
+          }
+
+          // Si estamos en modo demo o no hay conexión al servidor/signer
+          if (!signer || !gameConnection.connected) {
+            simulateJoinGame(betAmount);
+            return;
+          }
+
+          // Mostrar que estamos procesando
+          document.getElementById("joinGame").disabled = true;
+          document.getElementById("joinGame").textContent = "Processing...";
+
+          // Obtener saldo para verificar
+          const balance = await provider.getBalance(walletAddress);
+          const betAmountWei = ethers.parseEther(betAmount.toString());
+
+          // Verificar que tiene suficiente saldo (incluyendo gas)
+          const estimatedGasPrice = await provider.getFeeData();
+          const estimatedGasCost = ethers.parseEther("0.001"); // Estimación conservadora para gas
+
+          if (balance < betAmountWei + estimatedGasCost) {
+            alert(
+              `Insufficient balance. You need at least ${ethers.formatEther(
+                betAmountWei + estimatedGasCost
+              )} FLOW (bet + gas). You have ${ethers.formatEther(
+                balance
+              )} FLOW.`
+            );
+            document.getElementById("joinGame").disabled = false;
+            document.getElementById("joinGame").textContent =
+              "Join Game (Bet FLOW)";
+            return;
+          }
+
+          // Dirección del contrato inteligente
+          const contractAddress = "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489";
+
+          // Crear instancia del contrato con el ABI y signer
+          const contract = new ethers.Contract(
+            contractAddress,
+            SUMO_CONTRACT_ABI,
+            signer
+          );
+
+          try {
+            showMessage(`Processing ${betAmount} FLOW bet...`, 1500);
+
+            // Estimar gas antes de enviar la transacción
+            let gasEstimate;
+            try {
+              gasEstimate = await contract.joinGame.estimateGas({
+                value: betAmountWei,
+              });
+              console.log("Gas estimate:", gasEstimate.toString());
+            } catch (estimateError) {
+              console.warn(
+                "Gas estimation failed, using default:",
+                estimateError
+              );
+              gasEstimate = BigInt(300000); // Gas por defecto
+            }
+
+            // Añadir 20% de buffer al gas estimado
+            const gasLimit =
+              gasEstimate + (gasEstimate * BigInt(20)) / BigInt(100);
+
+            // Llamar a la función joinGame del contrato
+            const tx = await contract.joinGame({
+              value: betAmountWei,
+              gasLimit: gasLimit,
+            });
+
+            console.log("Transaction sent:", tx.hash);
+            showMessage(`Transaction pending: ${tx.hash.substring(0, 10)}...`);
+
+            // Esperar confirmación de la transacción
+            const receipt = await tx.wait();
+            console.log("Transaction confirmed:", receipt);
+
+            // Verificar si la transacción fue exitosa
+            if (receipt.status === 1) {
+              console.log("Transaction successful");
+
+              // Parsear eventos del contrato si los hay
+              try {
+                const events = receipt.logs
+                  .map((log) => {
+                    try {
+                      return contract.interface.parseLog(log);
+                    } catch (e) {
+                      return null;
+                    }
+                  })
+                  .filter((event) => event !== null);
+
+                console.log("Contract events:", events);
+
+                // Si hay un evento PlayerJoined, puedes extraer información adicional
+                const playerJoinedEvent = events.find(
+                  (event) => event.name === "PlayerJoined"
+                );
+                if (playerJoinedEvent) {
+                  console.log("Player joined event:", playerJoinedEvent.args);
+                }
+              } catch (eventError) {
+                console.warn("Error parsing events:", eventError);
+              }
+
+              // Unirse al juego a través de WebSocket después de la confirmación blockchain
+              if (gameConnection.connected) {
+                gameConnection.joinGame(betAmount, walletAddress, tx.hash);
+              } else {
+                // Modo offline: crear jugador localmente
+                createPlayer(betAmount);
+              }
+
+              showMessage(
+                `✅ Bet of ${betAmount} FLOW confirmed! Transaction: ${tx.hash.substring(
+                  0,
+                  10
+                )}...`,
+                4000
+              );
+              document.getElementById("joinGame").textContent = "Joined ✓";
+
+              // Actualizar saldo después de la transacción
+              setTimeout(async () => {
+                try {
+                  const newBalance = await provider.getBalance(walletAddress);
+                  console.log(
+                    "New balance:",
+                    ethers.formatEther(newBalance),
+                    "FLOW"
+                  );
+                } catch (balanceError) {
+                  console.warn("Error getting updated balance:", balanceError);
+                }
+              }, 2000);
+            } else {
+              throw new Error("Transaction failed");
+            }
+          } catch (txError) {
+            console.error("Transaction error:", txError);
+
+            let errorMessage = "Transaction failed";
+
+            // Manejar errores específicos
+            if (txError.code === "UNPREDICTABLE_GAS_LIMIT") {
+              errorMessage =
+                "Transaction would fail. Please check contract conditions.";
+            } else if (txError.code === "INSUFFICIENT_FUNDS") {
+              errorMessage = "Insufficient funds for transaction.";
+            } else if (txError.code === "USER_REJECTED") {
+              errorMessage = "Transaction rejected by user.";
+            } else if (txError.message.includes("revert")) {
+              // Extraer mensaje de revert si existe
+              const revertMatch = txError.message.match(/revert (.+?)(?:\s|$)/);
+              if (revertMatch) {
+                errorMessage = `Contract error: ${revertMatch[1]}`;
+              } else {
+                errorMessage = "Transaction reverted by contract.";
+              }
+            } else if (txError.message) {
+              errorMessage = txError.message;
+            }
+
+            alert(`❌ ${errorMessage}`);
+            showMessage(`Transaction failed: ${errorMessage}`, 4000);
+
+            // Restaurar estado del botón
+            document.getElementById("joinGame").disabled = false;
+            document.getElementById("joinGame").textContent =
+              "Join Game (Bet FLOW)";
+          }
+        } catch (error) {
+          console.error("Error in joinGame:", error);
+
+          let errorMessage = "Unknown error occurred";
+          if (error.message) {
+            errorMessage = error.message;
+          }
+
+          alert(`❌ Error: ${errorMessage}`);
+          showMessage(`Error: ${errorMessage}`, 4000);
+
+          // Restaurar estado del botón
+          document.getElementById("joinGame").disabled = false;
+          document.getElementById("joinGame").textContent =
+            "Join Game (Bet FLOW)";
+        }
+      }
+
+      // Simular unirse al juego (para demo)
+      function simulateJoinGame(betAmount) {
+        document.getElementById("joinGame").disabled = true;
+        document.getElementById("joinGame").textContent = "Processing...";
+
+        setTimeout(() => {
+          createPlayer(betAmount);
+
+          // Mensaje de confirmación
+          showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
+          document.getElementById("joinGame").textContent = "Joined ✓";
+        }, 1500);
+      }
+
+      // AÑADIR: Función para asignar personaje único
+      function getNextAvailableCharacter() {
+        // Buscar el siguiente personaje disponible
+        for (let i = 1; i <= 4; i++) {
+          if (!assignedCharacters.has(i)) {
+            assignedCharacters.add(i);
+            return i;
+          }
+        }
+
+        // Si todos están ocupados, reciclar desde el primero
+        const characterIndex = ((nextCharacterIndex - 1) % 4) + 1;
+        nextCharacterIndex++;
+        return characterIndex;
+      }
+
+      // AÑADIR: Función para liberar personaje
+      function releaseCharacter(characterIndex) {
+        assignedCharacters.delete(characterIndex);
+      }
+
+      // AÑADIR: Función para calcular tamaño del jugador
+      function calculatePlayerSize(bet) {
+        // Tamaño base mínimo
+        const minSize = 20;
+        // Tamaño máximo para evitar que se compriman demasiado
+        const maxSize = 50;
+        // Factor de escala: cada 0.01 FLOW añade ~10 unidades de radio
+        const scaleFactor = 1000;
+
+        const calculatedSize = minSize + bet * scaleFactor;
+        return Math.max(minSize, Math.min(maxSize, calculatedSize));
+      }
+
+      // MODIFICAR: Función para crear jugador con tamaño proporcional
+      function createPlayer(betAmount) {
+        const playerId = walletAddress;
+        gameState.myPlayerId = playerId;
+
+        // Asignar personaje único
+        const characterIndex = getNextAvailableCharacter();
+
+        const player = {
+          id: playerId,
+          address: walletAddress,
+          bet: betAmount,
+          x: centerX + (Math.random() - 0.5) * 200,
+          y: centerY + (Math.random() - 0.5) * 200,
+          vx: 0,
+          vy: 0,
+          radius: calculatePlayerSize(betAmount), // Usar nueva función de cálculo
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+          alive: true,
+          powerup: null,
+          powerupEndTime: 0,
+          keys: {},
+          rotation: Math.random() * Math.PI * 2,
+          rotationSpeed: 0,
+          // AÑADIR: Índice de personaje
+          characterIndex: characterIndex,
+        };
+
+        gameState.players.set(playerId, player);
+        gameState.prizePool += betAmount;
+
+        console.log(
+          `Jugador ${playerId} asignado al personaje ${characterIndex}, tamaño: ${player.radius}`
+        );
+
+        updateUI();
+
+        if (gameState.players.size >= GAME_CONFIG.minPlayers) {
+          document.getElementById("startGame").style.display = "inline-block";
+          if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+            document.getElementById("startGame").textContent =
+              "Start Game (Test Mode)";
+          } else {
+            document.getElementById("startGame").textContent = "Start Game";
+          }
+        }
+      }
+
+      // Función simulación sigue siendo útil para pruebas
+      function simulateWalletConnection() {
+        walletAddress = "0x" + Math.random().toString(16).substring(2, 42);
+        walletConnected = true;
+        document.getElementById("walletAddress").textContent =
+          walletAddress.substring(0, 6) + "..." + walletAddress.substring(38);
+        document.getElementById("connectWallet").textContent = "Connected ✓";
+        document.getElementById("connectWallet").disabled = true;
+      }
+
+      // Game functions
+      async function startGame() {
+            // Verificar si hay suficientes jugadores según la configuración
+            if (gameState.players.size < GAME_CONFIG.minPlayers) {
+                alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
+                return;
+            }
+
+            // Si no hay signer o no estamos conectados al servidor, usar modo offline
+            if (!signer || !gameConnection.connected) {
+                startGameOffline();
                 return;
             }
 
@@ -693,7 +1088,7 @@
                 // Verificar red correcta
                 const chainId = await window.ethereum.request({ method: 'eth_chainId' });
                 if (chainId !== FLOW_TESTNET.chainId) {
-                    alert('Please switch to Flow Testnet to play!');
+                    alert('Please switch to Flow Testnet to start the game!');
                     const switched = await switchToFlowTestnet();
                     if (!switched) {
                         showManualNetworkInstructions();
@@ -701,1295 +1096,1733 @@
                     }
                 }
 
-                const betAmount = parseFloat(document.getElementById('betAmount').value);
-                if (betAmount < 0.001) {
-                    alert('Minimum bet is 0.001 FLOW');
-                    return;
-                }
-                
-                // Si estamos en modo demo o no hay conexión al servidor
-                if (!signer || !gameConnection.connected) {
-                    simulateJoinGame(betAmount);
-                    return;
-                }
-
                 // Mostrar que estamos procesando
-                document.getElementById('joinGame').disabled = true;
-                document.getElementById('joinGame').textContent = 'Processing...';
-                
-                // Obtener saldo para verificar
-                const balance = await provider.getBalance(walletAddress);
-                const betAmountWei = ethers.parseEther(betAmount.toString());
-                
-                // Verificar que tiene suficiente saldo
-                if (balance < betAmountWei) {
-                    alert(`Insufficient balance. You have ${ethers.formatEther(balance)} FLOW.`);
-                    document.getElementById('joinGame').disabled = false;
-                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                document.getElementById('startGame').disabled = true;
+                document.getElementById('startGame').textContent = 'Starting...';
+                showMessage('Starting game on blockchain...', 2000);
+
+                // Crear instancia del contrato
+                const contract = new ethers.Contract(SUMO_CONTRACT_ADDRESS, SUMO_CONTRACT_ABI, signer);
+
+                // Verificar que el juego no esté ya en progreso
+                const currentGameState = await contract.getGameState();
+                if (currentGameState) {
+                    alert('Game is already in progress on the blockchain!');
+                    document.getElementById('startGame').disabled = false;
+                    document.getElementById('startGame').textContent = 'Start Game';
                     return;
                 }
-                
-                // Procesar transacción igual que antes
-                const targetAddress = "0xb322E239E5A32724633A595b8f8657F9cbb307B2";
-                
+
+                // Estimar gas
+                let gasEstimate;
                 try {
-                    showMessage(`Processing ${betAmount} FLOW bet...`, 1500);
-                    
-                    const tx = await signer.sendTransaction({
-                        to: targetAddress,
-                        value: betAmountWei,
-                        gasLimit: 100000
-                    });
-                    
-                    console.log("Transaction sent:", tx.hash);
-                    showMessage(`Transaction pending... Please wait.`);
-                    
-                    const receipt = await tx.wait();
-                    console.log("Transaction confirmed:", receipt);
-                    
-                    // Unirse al juego a través de WebSocket
-                    gameConnection.joinGame(betAmount, walletAddress);
-                    
-                    showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
-                    document.getElementById('joinGame').textContent = 'Joined ✓';
-                } catch (txError) {
-                    console.error("Transaction error:", txError);
-                    alert(`Transaction failed: ${txError.message}`);
-                    document.getElementById('joinGame').disabled = false;
-                    document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
+                    gasEstimate = await contract.startGame.estimateGas();
+                    console.log("Gas estimate for startGame:", gasEstimate.toString());
+                } catch (estimateError) {
+                    console.warn("Gas estimation failed, using default:", estimateError);
+                    gasEstimate = BigInt(500000); // Gas por defecto más alto para startGame
                 }
+
+                // Añadir 20% de buffer al gas estimado
+                const gasLimit = gasEstimate + (gasEstimate * BigInt(20) / BigInt(100));
+
+                // Ejecutar la función startGame del contrato
+                const tx = await contract.startGame({
+                    gasLimit: gasLimit
+                });
+
+                console.log("StartGame transaction sent:", tx.hash);
+                showMessage(`Starting game... TX: ${tx.hash.substring(0, 10)}...`);
+
+                // Esperar confirmación de la transacción
+                const receipt = await tx.wait();
+                console.log("StartGame transaction confirmed:", receipt);
+
+                if (receipt.status === 1) {
+                    console.log("StartGame transaction successful");
+
+                    // CAPTURAR LOS VALORES DE RETORNO
+                    // Nota: Los valores de retorno de funciones que modifican estado (no view/pure) 
+                    // no están disponibles directamente en el receipt. Necesitamos usar call() para obtenerlos.
+                    
+                    try {
+                        // Hacer una llamada estática para obtener los valores de retorno
+                        // (esto simula la llamada sin ejecutarla realmente)
+                        const powerupData = await contract.startGame.staticCall();
+                        
+                        console.log("Powerup data from contract:", powerupData);
+                        
+                        // Los valores se retornan como un array
+                        // return (power1, random_time1, power2, random_time2, power3, random_time3);
+                        const [power1, time1, power2, time2, power3, time3] = powerupData;
+                        
+                        console.log("Extracted powerups:");
+                        console.log("Powerup 1:", power1, "at time:", time1.toString());
+                        console.log("Powerup 2:", power2, "at time:", time2.toString());
+                        console.log("Powerup 3:", power3, "at time:", time3.toString());
+                        
+                        // Crear powerups en el juego local con los datos del contrato
+                        createPowerupsFromContract([
+                            { type: power1.toUpperCase(), spawnTime: Number(time1) },
+                            { type: power2.toUpperCase(), spawnTime: Number(time2) },
+                            { type: power3.toUpperCase(), spawnTime: Number(time3) }
+                        ]);
+                        
+                        showMessage(`🎮 Game started! Powerups: ${power1}, ${power2}, ${power3}`, 4000);
+                        
+                    } catch (callError) {
+                        console.warn("Could not get powerup data from contract:", callError);
+                        showMessage("Game started successfully! 🎮", 3000);
+                    }
+
+                    // ALTERNATIVA: Escuchar eventos del contrato para capturar los powerups
+                    try {
+                        // Buscar el evento PowerUpCreated en los logs del receipt
+                        const powerUpCreatedEvent = receipt.logs.find(log => {
+                            try {
+                                const parsedLog = contract.interface.parseLog(log);
+                                return parsedLog.name === 'PowerUpCreated';
+                            } catch (e) {
+                                return false;
+                            }
+                        });
+
+                        if (powerUpCreatedEvent) {
+                            const parsedEvent = contract.interface.parseLog(powerUpCreatedEvent);
+                            console.log("PowerUpCreated event found:", parsedEvent.args);
+                            
+                            // Extraer datos del evento
+                            const [power1, time1, power2, time2, power3, time3] = parsedEvent.args;
+                            
+                            console.log("Powerups from event:");
+                            console.log("Powerup 1:", power1, "at time:", time1.toString());
+                            console.log("Powerup 2:", power2, "at time:", time2.toString());
+                            console.log("Powerup 3:", power3, "at time:", time3.toString());
+                            
+                            // Usar estos datos para crear powerups
+                            createPowerupsFromContract([
+                                { type: power1.toUpperCase(), spawnTime: Number(time1) },
+                                { type: power2.toUpperCase(), spawnTime: Number(time2) },
+                                { type: power3.toUpperCase(), spawnTime: Number(time3) }
+                            ]);
+                        }
+                    } catch (eventError) {
+                        console.warn("Error parsing PowerUpCreated event:", eventError);
+                    }
+
+                    // Iniciar el juego localmente después de la confirmación blockchain
+                    if (gameConnection.connected) {
+                        gameConnection.startGame();
+                    } else {
+                        startGameOffline();
+                    }
+
+                    document.getElementById('startGame').style.display = 'none';
+
+                } else {
+                    throw new Error("Transaction failed");
+                }
+
             } catch (error) {
-                console.error("Error placing bet:", error);
-                alert(`Error placing bet: ${error.message}`);
-                document.getElementById('joinGame').disabled = false;
-                document.getElementById('joinGame').textContent = 'Join Game (Bet FLOW)';
-            }
-        }
-        
-        // Simular unirse al juego (para demo)
-        function simulateJoinGame(betAmount) {
-            document.getElementById('joinGame').disabled = true;
-            document.getElementById('joinGame').textContent = 'Processing...';
-            
-            setTimeout(() => {
-                createPlayer(betAmount);
+                console.error("Error starting game on blockchain:", error);
                 
-                // Mensaje de confirmación
-                showMessage(`Bet of ${betAmount} FLOW confirmed! 🎉`);
-                document.getElementById('joinGame').textContent = 'Joined ✓';
-            }, 1500);
-        }
-        
-        // AÑADIR: Función para asignar personaje único
-        function getNextAvailableCharacter() {
-            // Buscar el siguiente personaje disponible
-            for (let i = 1; i <= 4; i++) {
-                if (!assignedCharacters.has(i)) {
-                    assignedCharacters.add(i);
-                    return i;
-                }
-            }
-            
-            // Si todos están ocupados, reciclar desde el primero
-            const characterIndex = ((nextCharacterIndex - 1) % 4) + 1;
-            nextCharacterIndex++;
-            return characterIndex;
-        }
-
-        // AÑADIR: Función para liberar personaje
-        function releaseCharacter(characterIndex) {
-            assignedCharacters.delete(characterIndex);
-        }
-
-        // AÑADIR: Función para calcular tamaño del jugador
-        function calculatePlayerSize(bet) {
-            // Tamaño base mínimo
-            const minSize = 20;
-            // Tamaño máximo para evitar que se compriman demasiado
-            const maxSize = 50;
-            // Factor de escala: cada 0.01 FLOW añade ~10 unidades de radio
-            const scaleFactor = 1000;
-            
-            const calculatedSize = minSize + (bet * scaleFactor);
-            return Math.max(minSize, Math.min(maxSize, calculatedSize));
-        }
-
-        // MODIFICAR: Función para crear jugador con tamaño proporcional
-        function createPlayer(betAmount) {
-            const playerId = walletAddress;
-            gameState.myPlayerId = playerId;
-            
-            // Asignar personaje único
-            const characterIndex = getNextAvailableCharacter();
-            
-            const player = {
-                id: playerId,
-                address: walletAddress,
-                bet: betAmount,
-                x: centerX + (Math.random() - 0.5) * 200,
-                y: centerY + (Math.random() - 0.5) * 200,
-                vx: 0,
-                vy: 0,
-                radius: calculatePlayerSize(betAmount), // Usar nueva función de cálculo
-                color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-                alive: true,
-                powerup: null,
-                powerupEndTime: 0,
-                keys: {},
-                rotation: Math.random() * Math.PI * 2,
-                rotationSpeed: 0,
-                // AÑADIR: Índice de personaje
-                characterIndex: characterIndex
-            };
-
-            gameState.players.set(playerId, player);
-            gameState.prizePool += betAmount;
-            
-            console.log(`Jugador ${playerId} asignado al personaje ${characterIndex}, tamaño: ${player.radius}`);
-            
-            updateUI();
-            
-            if (gameState.players.size >= GAME_CONFIG.minPlayers) {
-                document.getElementById('startGame').style.display = 'inline-block';
-                if (GAME_CONFIG.testMode && gameState.players.size === 1) {
-                    document.getElementById('startGame').textContent = 'Start Game (Test Mode)';
-                } else {
-                    document.getElementById('startGame').textContent = 'Start Game';
-                }
-            }
-        }
-
-        // Función simulación sigue siendo útil para pruebas
-        function simulateWalletConnection() {
-            walletAddress = '0x' + Math.random().toString(16).substring(2, 42);
-            walletConnected = true;
-            document.getElementById('walletAddress').textContent = walletAddress.substring(0, 6) + '...' + walletAddress.substring(38);
-            document.getElementById('connectWallet').textContent = 'Connected ✓';
-            document.getElementById('connectWallet').disabled = true;
-        }
-
-        // Game functions
-        function startGame() {
-            // Verificar si hay suficientes jugadores según la configuración
-            if (gameState.players.size < GAME_CONFIG.minPlayers) {
-                alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
-                return;
-            }
-            
-            // Mostrar mensaje cuando se inicia en modo de prueba con 1 jugador
-            if (GAME_CONFIG.testMode && gameState.players.size === 1) {
-                showMessage('⚠️ Iniciando en modo prueba con 1 jugador', 3000);
-            }
-            
-            // Si tenemos conexión al servidor, enviamos la señal al servidor
-            if (gameConnection.connected) {
-                gameConnection.startGame();
-            } else {
-                // Modo offline (como estaba antes)
-                gameState.gamePhase = 'countdown';
-                gameState.countdown = 3;
-                document.getElementById('startGame').style.display = 'none';
+                let errorMessage = "Failed to start game";
                 
-                const countdownInterval = setInterval(() => {
-                    gameState.countdown--;
-                    if (gameState.countdown <= 0) {
-                        clearInterval(countdownInterval);
-                        gameState.gamePhase = 'playing';
-                        gameState.gameRunning = true;
-                        startGameTimer();
-                        spawnPowerup();
-                    }
-                }, 1000);
-            }
-        }
-
-        function startGameTimer() {
-            gameState.gameTime = 60;
-            const timer = setInterval(() => {
-                gameState.gameTime--;
-                updateUI(); // Ensure UI updates during game
-                
-                const alivePlayers = getAlivePlayers();
-                
-                // MODIFICAR: Simplificar lógica - terminar si queda 1 o menos jugadores
-                let shouldEndGame = false;
-                
-                if (alivePlayers.length <= 1) {
-                    shouldEndGame = true;
-                    if (alivePlayers.length === 1) {
-                        console.log(`Fin del juego: Ganador encontrado - ${alivePlayers[0].address.substring(0, 8)}...`);
+                // Manejar errores específicos
+                if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
+                    errorMessage = "Transaction would fail. Game may already be in progress.";
+                } else if (error.code === 'INSUFFICIENT_FUNDS') {
+                    errorMessage = "Insufficient funds for transaction.";
+                } else if (error.code === 'USER_REJECTED') {
+                    errorMessage = "Transaction rejected by user.";
+                } else if (error.message.includes('revert')) {
+                    const revertMatch = error.message.match(/revert (.+?)(?:\s|$)/);
+                    if (revertMatch) {
+                        errorMessage = `Contract error: ${revertMatch[1]}`;
                     } else {
-                        console.log('Fin del juego: No quedan jugadores vivos');
+                        errorMessage = "Transaction reverted by contract.";
                     }
-                } else if (gameState.gameTime <= 0) {
-                    shouldEndGame = true;
-                    console.log('Fin del juego: Tiempo agotado');
+                } else if (error.message) {
+                    errorMessage = error.message;
                 }
-                
-                if (shouldEndGame) {
-                    clearInterval(timer);
-                    endGame();
+
+                alert(`❌ ${errorMessage}`);
+                showMessage(`Failed to start game: ${errorMessage}`, 4000);
+
+                // Restaurar estado del botón
+                document.getElementById('startGame').disabled = false;
+                document.getElementById('startGame').textContent = 'Start Game';
+
+                // Fallback a modo offline si falla
+                if (confirm('Start game in offline mode instead?')) {
+                    startGameOffline();
                 }
-            }, 1000);
+            }
         }
 
-        // MODIFICAR: Simplificar función endGame
-        function endGame() {
-            gameState.gameRunning = false;
-            gameState.gamePhase = 'finished';
-            
-            const alivePlayers = getAlivePlayers();
-            
-            // Lógica unificada para todos los modos
+      function startGameTimer() {
+        gameState.gameTime = 60;
+        const timer = setInterval(() => {
+          gameState.gameTime--;
+          updateUI(); // Ensure UI updates during game
+
+          const alivePlayers = getAlivePlayers();
+
+          // MODIFICAR: Simplificar lógica - terminar si queda 1 o menos jugadores
+          let shouldEndGame = false;
+
+          if (alivePlayers.length <= 1) {
+            shouldEndGame = true;
             if (alivePlayers.length === 1) {
-                const winner = alivePlayers[0];
-                setTimeout(() => {
-                    if (GAME_CONFIG.testMode) {
-                        alert(`🎯 Test completed! Player ${winner.address.substring(0, 8)}... survived and wins ${gameState.prizePool.toFixed(3)} FLOW!`);
-                    } else {
-                        alert(`🏆 Winner: ${winner.address.substring(0, 8)}... wins ${gameState.prizePool.toFixed(3)} FLOW!`);
-                    }
-                    resetGame();
-                }, 500);
-            } else if (alivePlayers.length === 0) {
-                setTimeout(() => {
-                    if (GAME_CONFIG.testMode) {
-                        alert('💥 Test failed! All players were eliminated. Try again!');
-                    } else {
-                        alert('💥 All players eliminated! No winner this round.');
-                    }
-                    resetGame();
-                }, 500);
+              console.log(
+                `Fin del juego: Ganador encontrado - ${alivePlayers[0].address.substring(
+                  0,
+                  8
+                )}...`
+              );
             } else {
-                // Solo si el tiempo se agotó con múltiples jugadores vivos
-                setTimeout(() => {
-                    if (GAME_CONFIG.testMode) {
-                        alert('🕐 Time up! Test completed - multiple survivors!');
-                    } else {
-                        alert('🕐 Time up! No clear winner this round.');
-                    }
-                    resetGame();
-                }, 500);
+              console.log("Fin del juego: No quedan jugadores vivos");
             }
+          } else if (gameState.gameTime <= 0) {
+            shouldEndGame = true;
+            console.log("Fin del juego: Tiempo agotado");
+          }
+
+          if (shouldEndGame) {
+            clearInterval(timer);
+            endGame();
+          }
+        }, 1000);
+      }
+
+      // MODIFICAR: Función endGame para mostrar botón de claim winner
+      function endGame() {
+        gameState.gameRunning = false;
+        gameState.gamePhase = "finished";
+
+        const alivePlayers = getAlivePlayers();
+
+        // Lógica para mostrar botón de claim winner
+        if (alivePlayers.length === 1) {
+          const winner = alivePlayers[0];
+          
+          // Verificar si el ganador soy yo
+          const isMyWin = winner.id === gameState.myPlayerId;
+          
+          setTimeout(() => {
+            // Crear modal para el resultado del juego
+            const gameEndModal = document.createElement("div");
+            gameEndModal.style.position = "fixed";
+            gameEndModal.style.top = "0";
+            gameEndModal.style.left = "0";
+            gameEndModal.style.width = "100%";
+            gameEndModal.style.height = "100%";
+            gameEndModal.style.background = "rgba(0,0,0,0.8)";
+            gameEndModal.style.display = "flex";
+            gameEndModal.style.justifyContent = "center";
+            gameEndModal.style.alignItems = "center";
+            gameEndModal.style.zIndex = "2000";
+
+            const modalContent = document.createElement("div");
+            modalContent.style.background = "#2d3748";
+            modalContent.style.padding = "30px";
+            modalContent.style.borderRadius = "15px";
+            modalContent.style.textAlign = "center";
+            modalContent.style.border = "3px solid #FFD700";
+            modalContent.style.minWidth = "400px";
+
+            if (isMyWin) {
+              modalContent.innerHTML = `
+                <h2 style="color: #FFD700; margin-bottom: 20px;">🏆 CONGRATULATIONS!</h2>
+                <p style="color: white; font-size: 18px; margin-bottom: 20px;">
+                  You won ${gameState.prizePool.toFixed(3)} FLOW!
+                </p>
+                <p style="color: #ccc; margin-bottom: 30px;">
+                  Click the button below to claim your prize from the smart contract.
+                </p>
+                <button id="claimWinnerBtn" class="btn" style="
+                  background: linear-gradient(45deg, #FFD700, #FFA500);
+                  color: black;
+                  font-weight: bold;
+                  padding: 15px 30px;
+                  font-size: 16px;
+                  margin-right: 15px;
+                ">
+                  🎉 Claim Prize (${gameState.prizePool.toFixed(3)} FLOW)
+                </button>
+                <button id="skipClaimBtn" class="btn" style="
+                  background: #666;
+                  padding: 15px 30px;
+                ">
+                  Skip (Play Again)
+                </button>
+              `;
+            } else {
+              modalContent.innerHTML = `
+                <h2 style="color: #ff6b6b; margin-bottom: 20px;">💀 GAME OVER</h2>
+                <p style="color: white; font-size: 18px; margin-bottom: 20px;">
+                  Winner: ${winner.address.substring(0, 8)}...
+                </p>
+                <p style="color: #ccc; margin-bottom: 30px;">
+                  Prize: ${gameState.prizePool.toFixed(3)} FLOW
+                </p>
+                <button id="playAgainBtn" class="btn" style="
+                  background: linear-gradient(45deg, #4ecdc4, #44b7d1);
+                  padding: 15px 30px;
+                  font-size: 16px;
+                ">
+                  🔄 Play Again
+                </button>
+              `;
+            }
+
+            gameEndModal.appendChild(modalContent);
+            document.body.appendChild(gameEndModal);
+
+            // Event listeners para los botones
+            if (isMyWin) {
+              document.getElementById("claimWinnerBtn").addEventListener("click", () => {
+                claimWinnerPrize(winner.address);
+                document.body.removeChild(gameEndModal);
+              });
+
+              document.getElementById("skipClaimBtn").addEventListener("click", () => {
+                document.body.removeChild(gameEndModal);
+                resetGame();
+              });
+            } else {
+              document.getElementById("playAgainBtn").addEventListener("click", () => {
+                document.body.removeChild(gameEndModal);
+                resetGame();
+              });
+            }
+
+          }, 500);
+
+        } else if (alivePlayers.length === 0) {
+          setTimeout(() => {
+            if (GAME_CONFIG.testMode) {
+              alert("💥 Test failed! All players were eliminated. Try again!");
+            } else {
+              alert("💥 All players eliminated! No winner this round.");
+            }
+            resetGame();
+          }, 500);
+        } else {
+          // Solo si el tiempo se agotó con múltiples jugadores vivos
+          setTimeout(() => {
+            if (GAME_CONFIG.testMode) {
+              alert("🕐 Time up! Test completed - multiple survivors!");
+            } else {
+              alert("🕐 Time up! No clear winner this round.");
+            }
+            resetGame();
+          }, 500);
+        }
+      }
+
+      // AÑADIR: Nueva función para claim winner prize del smart contract
+      async function claimWinnerPrize(winnerAddress) {
+        try {
+          if (!signer || !walletConnected) {
+            alert("Please connect your wallet first!");
+            resetGame();
+            return;
+          }
+
+          // Verificar red correcta
+          const chainId = await window.ethereum.request({
+            method: "eth_chainId",
+          });
+          if (chainId !== FLOW_TESTNET.chainId) {
+            alert("Please switch to Flow Testnet to claim your prize!");
+            const switched = await switchToFlowTestnet();
+            if (!switched) {
+              showManualNetworkInstructions();
+              return;
+            }
+          }
+
+          // Crear instancia del contrato
+          const contractAddress = "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489";
+          const contract = new ethers.Contract(
+            contractAddress,
+            SUMO_CONTRACT_ABI,
+            signer
+          );
+
+          // Verificar que el juego esté activo y que soy el ganador válido
+          const isGameActive = await contract.getGameState();
+          if (!isGameActive) {
+            alert("Game is not active on the blockchain. Prize may have already been claimed.");
+            resetGame();
+            return;
+          }
+
+          const activePlayers = await contract.getActivePlayers();
+          const isPlayerInGame = activePlayers.some(
+            (playerAddress) => playerAddress.toLowerCase() === winnerAddress.toLowerCase()
+          );
+
+          if (!isPlayerInGame) {
+            alert("You are not a valid player in this game.");
+            resetGame();
+            return;
+          }
+
+          // Mostrar loading
+          showMessage("Claiming prize from smart contract...", 0);
+
+          // Estimar gas
+          let gasEstimate;
+          try {
+            gasEstimate = await contract.assignWinnerAndRestart.estimateGas(winnerAddress);
+            console.log("Gas estimate for assignWinnerAndRestart:", gasEstimate.toString());
+          } catch (estimateError) {
+            console.warn("Gas estimation failed, using default:", estimateError);
+            gasEstimate = BigInt(400000); // Gas por defecto para esta función
+          }
+
+          // Añadir 20% de buffer al gas estimado
+          const gasLimit = gasEstimate + (gasEstimate * BigInt(20) / BigInt(100));
+
+          // Ejecutar assignWinnerAndRestart
+          const tx = await contract.assignWinnerAndRestart(winnerAddress, {
+            gasLimit: gasLimit
+          });
+
+          console.log("AssignWinnerAndRestart transaction sent:", tx.hash);
+          showMessage(`Claiming prize... TX: ${tx.hash.substring(0, 10)}...`, 0);
+
+          // Esperar confirmación
+          const receipt = await tx.wait();
+          console.log("AssignWinnerAndRestart transaction confirmed:", receipt);
+
+          if (receipt.status === 1) {
+            console.log("Prize claimed successfully!");
+
+            // Parsear eventos del contrato
+            try {
+              const events = receipt.logs
+                .map((log) => {
+                  try {
+                    return contract.interface.parseLog(log);
+                  } catch (e) {
+                    return null;
+                  }
+                })
+                .filter((event) => event !== null);
+
+              console.log("Contract events:", events);
+
+              // Buscar evento GameEnded
+              const gameEndedEvent = events.find(
+                (event) => event.name === "GameEnded"
+              );
+              
+              if (gameEndedEvent) {
+                const [winner, prizeAmount] = gameEndedEvent.args;
+                const prizeInEther = ethers.formatEther(prizeAmount);
+                console.log("Game ended event:", {
+                  winner: winner,
+                  prize: prizeInEther
+                });
+
+                showMessage(`🎉 Prize claimed! ${prizeInEther} FLOW transferred to your wallet!`, 6000);
+                
+                // Mostrar modal de éxito
+                setTimeout(() => {
+                  const successModal = document.createElement("div");
+                  successModal.style.position = "fixed";
+                  successModal.style.top = "0";
+                  successModal.style.left = "0";
+                  successModal.style.width = "100%";
+                  successModal.style.height = "100%";
+                  successModal.style.background = "rgba(0,0,0,0.9)";
+                  successModal.style.display = "flex";
+                  successModal.style.justifyContent = "center";
+                  successModal.style.alignItems = "center";
+                  successModal.style.zIndex = "2001";
+
+                  successModal.innerHTML = `
+                    <div style="
+                      background: linear-gradient(135deg, #FFD700, #FFA500);
+                      padding: 40px;
+                      border-radius: 20px;
+                      text-align: center;
+                      color: black;
+                      max-width: 500px;
+                      animation: bounce 0.6s ease-out;
+                    ">
+                      <h1 style="margin-bottom: 20px; font-size: 2.5em;">🏆</h1>
+                      <h2 style="margin-bottom: 15px;">PRIZE CLAIMED!</h2>
+                      <p style="font-size: 1.2em; margin-bottom: 20px;">
+                        ${prizeInEther} FLOW transferred to your wallet!
+                      </p>
+                      <p style="font-size: 0.9em; margin-bottom: 25px; opacity: 0.8;">
+                        Transaction: ${tx.hash.substring(0, 20)}...
+                      </p>
+                      <button id="continueBtn" style="
+                        background: #2d3748;
+                        color: white;
+                        border: none;
+                        padding: 15px 30px;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        cursor: pointer;
+                      ">
+                        Continue Playing 🎮
+                      </button>
+                    </div>
+                  `;
+
+                  document.body.appendChild(successModal);
+
+                  document.getElementById("continueBtn").addEventListener("click", () => {
+                    document.body.removeChild(successModal);
+                    resetGame();
+                  });
+
+                }, 1000);
+
+              } else {
+                showMessage("Prize claimed successfully! Check your wallet.", 4000);
+                setTimeout(() => resetGame(), 3000);
+              }
+
+            } catch (eventError) {
+              console.warn("Error parsing events:", eventError);
+              showMessage("Prize claimed successfully! Check your wallet.", 4000);
+              setTimeout(() => resetGame(), 3000);
+            }
+
+          } else {
+            throw new Error("Transaction failed");
+          }
+
+        } catch (error) {
+          console.error("Error claiming prize:", error);
+
+          let errorMessage = "Failed to claim prize";
+
+          // Manejar errores específicos
+          if (error.code === "UNPREDICTABLE_GAS_LIMIT") {
+            errorMessage = "Transaction would fail. Game may have already ended.";
+          } else if (error.code === "INSUFFICIENT_FUNDS") {
+            errorMessage = "Insufficient funds for transaction fees.";
+          } else if (error.code === "USER_REJECTED") {
+            errorMessage = "Transaction rejected by user.";
+          } else if (error.message.includes("revert")) {
+            const revertMatch = error.message.match(/revert (.+?)(?:\s|$)/);
+            if (revertMatch) {
+              errorMessage = `Contract error: ${revertMatch[1]}`;
+            } else {
+              errorMessage = "Transaction reverted by contract.";
+            }
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+
+          alert(`❌ ${errorMessage}`);
+          showMessage(`Failed to claim prize: ${errorMessage}`, 5000);
+
+          // Permitir continuar sin claim
+          setTimeout(() => {
+            if (confirm("Would you like to continue playing without claiming the prize?")) {
+              resetGame();
+            }
+          }, 2000);
+        }
+      }
+
+      // AÑADIR: Función auxiliar para mostrar mensajes permanentes hasta ser removidos
+      function showMessage(text, duration = 2000) {
+        // Remover mensaje anterior si existe
+        const existingMessage = document.getElementById("gameMessage");
+        if (existingMessage) {
+          document.body.removeChild(existingMessage);
         }
 
-        // MODIFICAR: Limpiar personajes asignados al resetear el juego
-        function resetGame() {
-            // Liberar todos los personajes asignados
-            assignedCharacters.clear();
-            nextCharacterIndex = 1;
-            
-            // Reset game state for a new round
-            gameState = {
-                players: new Map(),
-                powerups: [],
-                gameRunning: false,
-                gamePhase: 'waiting',
-                prizePool: 0,
-                myPlayerId: null,
-                countdown: 0,
-                gameTime: 60
+        const message = document.createElement("div");
+        message.id = "gameMessage";
+        message.style.position = "fixed";
+        message.style.top = "20px";
+        message.style.left = "50%";
+        message.style.transform = "translateX(-50%)";
+        message.style.background = "rgba(0,0,0,0.9)";
+        message.style.color = "white";
+        message.style.padding = "15px 25px";
+        message.style.borderRadius = "25px";
+        message.style.fontWeight = "bold";
+        message.style.zIndex = "1500";
+        message.style.border = "2px solid #FFD700";
+        message.textContent = text;
+
+        document.body.appendChild(message);
+
+        if (duration > 0) {
+          setTimeout(() => {
+            if (document.getElementById("gameMessage") === message) {
+              message.style.opacity = "0";
+              message.style.transition = "opacity 0.5s";
+              setTimeout(() => {
+                if (document.body.contains(message)) {
+                  document.body.removeChild(message);
+                }
+              }, 500);
+            }
+          }, duration);
+        }
+      }
+
+      // MODIFICAR: Limpiar personajes asignados al resetear el juego
+      function resetGame() {
+        // Liberar todos los personajes asignados
+        assignedCharacters.clear();
+        nextCharacterIndex = 1;
+
+        // Reset game state for a new round
+        gameState = {
+          players: new Map(),
+          powerups: [],
+          gameRunning: false,
+          gamePhase: "waiting",
+          prizePool: 0,
+          myPlayerId: null,
+          countdown: 0,
+          gameTime: 60,
+        };
+
+        // Re-enable UI controls
+        document.getElementById("joinGame").disabled = false;
+        document.getElementById("startGame").style.display = "none";
+        document.getElementById("connectWallet").disabled = walletConnected;
+
+        // Clear player input state
+        Object.keys(keys).forEach((key) => (keys[key] = false));
+
+        updateUI();
+
+        // Add demo players again for testing
+        setTimeout(() => {
+          if (gameState.players.size === 0) {
+            addDemoPlayers();
+          }
+        }, 1000);
+      }
+
+      // MODIFICAR: Función para agregar jugadores demo con tamaños variados
+      function addDemoPlayers() {
+        // Add some AI players for demo with varied bet amounts
+        const demoPlayers = [
+          { bet: 0.005, color: "#ff6b6b" }, // Pequeño
+          { bet: 0.025, color: "#4ecdc4" }, // Grande
+          { bet: 0.015, color: "#45b7d1" }, // Mediano
+        ];
+
+        demoPlayers.forEach((demo, i) => {
+          const playerId = `demo_${i}`;
+          const characterIndex = getNextAvailableCharacter();
+
+          const player = {
+            id: playerId,
+            address: "0x" + Math.random().toString(16).substring(2, 42),
+            bet: demo.bet,
+            x: centerX + (Math.random() - 0.5) * 200,
+            y: centerY + (Math.random() - 0.5) * 200,
+            vx: 0,
+            vy: 0,
+            radius: calculatePlayerSize(demo.bet), // Usar nueva función de cálculo
+            color: demo.color,
+            alive: true,
+            powerup: null,
+            powerupEndTime: 0,
+            keys: {},
+            isAI: true,
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: 0,
+            // AÑADIR: Índice de personaje
+            characterIndex: characterIndex,
+          };
+
+          gameState.players.set(playerId, player);
+          gameState.prizePool += demo.bet;
+
+          console.log(
+            `Demo player ${playerId} asignado al personaje ${characterIndex}, tamaño: ${player.radius}`
+          );
+        });
+
+        updateUI();
+      }
+
+      // Input handling
+      const keys = {};
+      function handleKeyDown(e) {
+        // MODIFICAR: Permitir input tanto en juego como en sala de espera
+        if (!gameState.gameRunning && gameState.gamePhase !== "waiting") return;
+
+        // Prevent scrolling with arrow keys
+        if (
+          ["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(
+            e.key.toLowerCase()
+          )
+        ) {
+          e.preventDefault();
+        }
+
+        keys[e.key.toLowerCase()] = true;
+
+        // Enviar al servidor si estamos conectados
+        if (gameConnection.connected && gameState.myPlayerId) {
+          gameConnection.sendPlayerInput(keys);
+        }
+
+        // Actualización local para mejor responsividad
+        if (
+          gameState.myPlayerId &&
+          gameState.players.has(gameState.myPlayerId)
+        ) {
+          const player = gameState.players.get(gameState.myPlayerId);
+          if (player.alive) {
+            player.keys = { ...keys };
+          }
+        }
+      }
+
+      function handleKeyUp(e) {
+        // MODIFICAR: Permitir input tanto en juego como en sala de espera
+        if (!gameState.gameRunning && gameState.gamePhase !== "waiting") return;
+
+        // Prevent scrolling with arrow keys (also on keyup for completeness, though keydown is primary)
+        if (
+          ["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(
+            e.key.toLowerCase()
+          )
+        ) {
+          e.preventDefault();
+        }
+
+        keys[e.key.toLowerCase()] = false;
+
+        // Enviar al servidor si estamos conectados
+        if (gameConnection.connected && gameState.myPlayerId) {
+          gameConnection.sendPlayerInput(keys);
+        }
+
+        // Actualización local para mejor responsividad
+        if (
+          gameState.myPlayerId &&
+          gameState.players.has(gameState.myPlayerId)
+        ) {
+          const player = gameState.players.get(gameState.myPlayerId);
+          if (player.alive) {
+            player.keys = { ...keys };
+          }
+        }
+      }
+
+      // Game loop
+      function gameLoop() {
+        update();
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function update() {
+        // Si el juego está en modo online, no actualizamos la física localmente
+        // Solo el servidor calcula la física y nos envía las actualizaciones
+        if (
+          gameConnection.connected &&
+          (gameState.gameRunning || gameState.gamePhase === "waiting")
+        ) {
+          // MODIFICAR: Aplicar predicción tanto en juego como en sala de espera
+          if (
+            gameState.myPlayerId &&
+            gameState.players.has(gameState.myPlayerId)
+          ) {
+            const player = gameState.players.get(gameState.myPlayerId);
+            if (player.alive) {
+              // Aplicar inputs locales (predicción cliente)
+              if (gameState.gamePhase === "waiting") {
+                applyWaitingRoomInput(player);
+              } else {
+                applyPlayerInput(player);
+              }
+            }
+          }
+          return;
+        }
+
+        // AÑADIR: Modo offline para sala de espera
+        if (gameState.gamePhase === "waiting") {
+          updateWaitingRoomOffline();
+          return;
+        }
+
+        // Modo offline: actualizar todo localmente como antes
+        if (!gameState.gameRunning) return;
+
+        // Update players
+        gameState.players.forEach((player) => {
+          if (!player.alive) return;
+
+          // AI movement
+          if (player.isAI) {
+            updateAI(player);
+          }
+
+          // MODIFICAR: Movimiento ajustado por tamaño del jugador
+          const baseSpeed = player.powerup === "SPEED" ? 1.2 : 0.7;
+          // Factor de masa más realista: jugadores más grandes son más lentos pero más fuertes
+          const mass = Math.pow(player.radius / 20, 1.5); // Más gradual que el anterior
+          const speed = baseSpeed / Math.sqrt(mass);
+
+          if (player.keys["w"] || player.keys["arrowup"]) player.vy -= speed;
+          if (player.keys["s"] || player.keys["arrowdown"]) player.vy += speed;
+          if (player.keys["a"] || player.keys["arrowleft"]) player.vx -= speed;
+          if (player.keys["d"] || player.keys["arrowright"]) player.vx += speed;
+
+          // Apply velocity
+          player.x += player.vx;
+          player.y += player.vy;
+
+          // Reduced friction for more momentum
+          player.vx *= 0.92; // Was 0.85
+          player.vy *= 0.92;
+
+          // Check ring boundaries with better elimination logic
+          const distFromCenter = Math.sqrt(
+            Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2)
+          );
+          if (distFromCenter + player.radius > ringRadius) {
+            // Give player a chance to recover if just touching edge
+            if (distFromCenter + player.radius > ringRadius + 10) {
+              player.alive = false;
+              // MODIFICAR: Mejorar mensaje de eliminación
+              const remainingAlive = getAlivePlayers().length - 1; // -1 porque este jugador aún cuenta como vivo en el array
+              console.log(
+                `Player ${player.address.substring(
+                  0,
+                  8
+                )} eliminated! ${remainingAlive} players remaining.`
+              );
+
+              // AÑADIR: Verificar inmediatamente si el juego debe terminar
+              if (remainingAlive <= 1) {
+                console.log(
+                  "Verificación inmediata: Juego debe terminar por eliminación"
+                );
+                // Pequeño delay para que la eliminación se procese visualmente
+                setTimeout(() => {
+                  if (gameState.gameRunning) {
+                    // Solo si el juego aún está corriendo
+                    endGame();
+                  }
+                }, 100);
+              }
+            } else {
+              // Push back toward center with strong force
+              const pushAngle = Math.atan2(
+                player.y - centerY,
+                player.x - centerX
+              );
+              player.vx -= Math.cos(pushAngle) * 2;
+              player.vy -= Math.sin(pushAngle) * 2;
+            }
+          }
+
+          // Check powerup expiration
+          if (player.powerupEndTime && Date.now() > player.powerupEndTime) {
+            player.powerup = null;
+            player.powerupEndTime = 0;
+          }
+
+          // Actualizar rotación basada en movimiento
+          if (player.vx !== 0 || player.vy !== 0) {
+            // Calcular dirección de movimiento
+            player.rotation = Math.atan2(player.vy, player.vx);
+            // Añadir variación en la rotación para efecto visual
+            player.rotationSpeed =
+              Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 0.01;
+          } else {
+            // Reducir velocidad de rotación cuando está quieto
+            player.rotationSpeed *= 0.95;
+          }
+        });
+
+        // Collision detection
+        const playersArray = Array.from(gameState.players.values()).filter(
+          (p) => p.alive
+        );
+        for (let i = 0; i < playersArray.length; i++) {
+          for (let j = i + 1; j < playersArray.length; j++) {
+            checkCollision(playersArray[i], playersArray[j]);
+          }
+        }
+
+        // Powerup collisions - fixing the collection logic
+        for (let i = gameState.powerups.length - 1; i >= 0; i--) {
+          const powerup = gameState.powerups[i];
+          const playersArray = Array.from(gameState.players.values()).filter(
+            (p) => p.alive
+          );
+
+          for (let j = 0; j < playersArray.length; j++) {
+            const player = playersArray[j];
+            const dist = Math.sqrt(
+              Math.pow(player.x - powerup.x, 2) +
+                Math.pow(player.y - powerup.y, 2)
+            );
+
+            if (dist < player.radius + 15) {
+              // Collect powerup
+              player.powerup = powerup.type;
+              player.powerupEndTime =
+                Date.now() + POWERUP_TYPES[powerup.type].duration;
+
+              // Remove from array safely
+              gameState.powerups.splice(i, 1);
+
+              // Show feedback
+              if (player.id === gameState.myPlayerId) {
+                showMessage(`Got ${powerup.type} powerup!`);
+              }
+              break; // Exit inner loop once powerup is collected
+            }
+          }
+        }
+
+        // Spawn powerups randomly
+        if (Math.random() < 0.01 && gameState.gamePhase === "playing") {
+          spawnPowerup();
+        }
+      }
+
+      // Nueva función para aplicar inputs de jugador (predicción cliente)
+      function applyPlayerInput(player) {
+        // Movimiento basado en las teclas presionadas
+        const baseSpeed = player.powerup === "SPEED" ? 1.2 : 0.7;
+        // MODIFICAR: Factor de masa más realista basado en el tamaño
+        const mass = Math.pow(player.radius / 20, 1.5); // Más gradual
+        const speed = baseSpeed / Math.sqrt(mass);
+
+        if (player.keys["w"] || player.keys["arrowup"])
+          player.vy -= speed * 0.5;
+        if (player.keys["s"] || player.keys["arrowdown"])
+          player.vy += speed * 0.5;
+        if (player.keys["a"] || player.keys["arrowleft"])
+          player.vx -= speed * 0.5;
+        if (player.keys["d"] || player.keys["arrowright"])
+          player.vx += speed * 0.5;
+
+        // Aplicar velocidad (solo una fracción para evitar desincronización)
+        player.x += player.vx * 0.5;
+        player.y += player.vy * 0.5;
+      }
+
+      // AÑADIR: Función para aplicar inputs en sala de espera
+      function applyWaitingRoomInput(player) {
+        const baseSpeed = 0.4; // Velocidad reducida
+        // MODIFICAR: Factor de masa más realista
+        const mass = Math.pow(player.radius / 20, 1.5);
+        const speed = baseSpeed / Math.sqrt(mass);
+
+        if (player.keys["w"] || player.keys["arrowup"])
+          player.vy -= speed * 0.3;
+        if (player.keys["s"] || player.keys["arrowdown"])
+          player.vy += speed * 0.3;
+        if (player.keys["a"] || player.keys["arrowleft"])
+          player.vx -= speed * 0.3;
+        if (player.keys["d"] || player.keys["arrowright"])
+          player.vx += speed * 0.3;
+
+        // Aplicar velocidad (predicción suave)
+        player.x += player.vx * 0.3;
+        player.y += player.vy * 0.3;
+      }
+
+      function updateAI(player) {
+        // Simple AI: move toward center and avoid edges
+        const distFromCenter = Math.sqrt(
+          Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2)
+        );
+
+        if (distFromCenter > ringRadius * 0.7) {
+          // Move toward center
+          const angle = Math.atan2(centerY - player.y, centerX - player.x);
+          player.keys = {
+            w: Math.sin(angle) < -0.3,
+            s: Math.sin(angle) > 0.3,
+            a: Math.cos(angle) < -0.3,
+            d: Math.cos(angle) > 0.3,
+          };
+        } else {
+          // Random movement
+          if (Math.random() < 0.1) {
+            player.keys = {
+              w: Math.random() < 0.25,
+              s: Math.random() < 0.25,
+              a: Math.random() < 0.25,
+              d: Math.random() < 0.25,
             };
-            
-            // Re-enable UI controls
-            document.getElementById('joinGame').disabled = false;
-            document.getElementById('startGame').style.display = 'none';
-            document.getElementById('connectWallet').disabled = walletConnected;
-            
-            // Clear player input state
-            Object.keys(keys).forEach(key => keys[key] = false);
-            
-            updateUI();
-            
-            // Add demo players again for testing
-            setTimeout(() => {
-                if (gameState.players.size === 0) {
-                    addDemoPlayers();
-                }
-            }, 1000);
+          }
         }
+      }
 
-        // MODIFICAR: Función para agregar jugadores demo con tamaños variados
-        function addDemoPlayers() {
-            // Add some AI players for demo with varied bet amounts
-            const demoPlayers = [
-                { bet: 0.005, color: '#ff6b6b' },   // Pequeño
-                { bet: 0.025, color: '#4ecdc4' },   // Grande
-                { bet: 0.015, color: '#45b7d1' }    // Mediano
-            ];
-            
-            demoPlayers.forEach((demo, i) => {
-                const playerId = `demo_${i}`;
-                const characterIndex = getNextAvailableCharacter();
-                
-                const player = {
-                    id: playerId,
-                    address: '0x' + Math.random().toString(16).substring(2, 42),
-                    bet: demo.bet,
-                    x: centerX + (Math.random() - 0.5) * 200,
-                    y: centerY + (Math.random() - 0.5) * 200,
-                    vx: 0,
-                    vy: 0,
-                    radius: calculatePlayerSize(demo.bet), // Usar nueva función de cálculo
-                    color: demo.color,
-                    alive: true,
-                    powerup: null,
-                    powerupEndTime: 0,
-                    keys: {},
-                    isAI: true,
-                    rotation: Math.random() * Math.PI * 2,
-                    rotationSpeed: 0,
-                    // AÑADIR: Índice de personaje
-                    characterIndex: characterIndex
-                };
-                
-                gameState.players.set(playerId, player);
-                gameState.prizePool += demo.bet;
-                
-                console.log(`Demo player ${playerId} asignado al personaje ${characterIndex}, tamaño: ${player.radius}`);
-            });
-            
-            updateUI();
+      // AÑADIR: Actualización de sala de espera en modo offline
+      function updateWaitingRoomOffline() {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const ringRadius = 280;
+
+        // Actualizar jugadores en sala de espera
+        gameState.players.forEach((player) => {
+          if (!player.alive) return;
+
+          // AI movement (si aplica)
+          if (player.isAI) {
+            updateAIWaitingRoom(player);
+          }
+
+          // MODIFICAR: Movimiento ajustado por tamaño en sala de espera
+          const baseSpeed = 0.4;
+          const mass = Math.pow(player.radius / 20, 1.5);
+          const speed = baseSpeed / Math.sqrt(mass);
+
+          if (player.keys["w"] || player.keys["arrowup"]) player.vy -= speed;
+          if (player.keys["s"] || player.keys["arrowdown"]) player.vy += speed;
+          if (player.keys["a"] || player.keys["arrowleft"]) player.vx -= speed;
+          if (player.keys["d"] || player.keys["arrowright"]) player.vx += speed;
+
+          // Aplicar velocidad
+          player.x += player.vx;
+          player.y += player.vy;
+
+          // Fricción aumentada
+          player.vx *= 0.85;
+          player.vy *= 0.85;
+
+          // Mantener dentro del ring con rebote suave
+          const distFromCenter = Math.sqrt(
+            Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2)
+          );
+          if (distFromCenter + player.radius > ringRadius) {
+            const pushAngle = Math.atan2(
+              player.y - centerY,
+              player.x - centerX
+            );
+            player.vx -= Math.cos(pushAngle) * 1.5;
+            player.vy -= Math.sin(pushAngle) * 1.5;
+
+            if (distFromCenter + player.radius > ringRadius + 20) {
+              const newDist = ringRadius - player.radius - 10;
+              player.x = centerX + Math.cos(pushAngle) * newDist;
+              player.y = centerY + Math.sin(pushAngle) * newDist;
+            }
+          }
+
+          // Actualizar rotación
+          if (player.vx !== 0 || player.vy !== 0) {
+            player.rotation = Math.atan2(player.vy, player.vx);
+            player.rotationSpeed =
+              Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 0.01;
+          } else {
+            player.rotationSpeed *= 0.95;
+          }
+        });
+
+        // Colisiones suaves entre jugadores
+        const playersArray = Array.from(gameState.players.values()).filter(
+          (p) => p.alive
+        );
+        for (let i = 0; i < playersArray.length; i++) {
+          for (let j = i + 1; j < playersArray.length; j++) {
+            checkWaitingRoomCollisionOffline(playersArray[i], playersArray[j]);
+          }
         }
+      }
 
-        // Input handling
-        const keys = {};
-        function handleKeyDown(e) {
-            // MODIFICAR: Permitir input tanto en juego como en sala de espera
-            if (!gameState.gameRunning && gameState.gamePhase !== 'waiting') return;
-
-            // Prevent scrolling with arrow keys
-            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
-                e.preventDefault();
-            }
-            
-            keys[e.key.toLowerCase()] = true;
-            
-            // Enviar al servidor si estamos conectados
-            if (gameConnection.connected && gameState.myPlayerId) {
-                gameConnection.sendPlayerInput(keys);
-            }
-            
-            // Actualización local para mejor responsividad
-            if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
-                const player = gameState.players.get(gameState.myPlayerId);
-                if (player.alive) {
-                    player.keys = {...keys};
-                }
-            }
+      // AÑADIR: AI simplificado para sala de espera
+      function updateAIWaitingRoom(player) {
+        // Movimiento más calmado en sala de espera
+        if (Math.random() < 0.05) {
+          // Menos frecuente
+          player.keys = {
+            w: Math.random() < 0.15,
+            s: Math.random() < 0.15,
+            a: Math.random() < 0.15,
+            d: Math.random() < 0.15,
+          };
         }
+      }
 
-        function handleKeyUp(e) {
-            // MODIFICAR: Permitir input tanto en juego como en sala de espera
-            if (!gameState.gameRunning && gameState.gamePhase !== 'waiting') return;
+      function checkCollision(p1, p2) {
+        const dx = p1.x - p2.x;
+        const dy = p2.y - p2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Prevent scrolling with arrow keys (also on keyup for completeness, though keydown is primary)
-            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
-                e.preventDefault();
-            }
-            
-            keys[e.key.toLowerCase()] = false;
-            
-            // Enviar al servidor si estamos conectados
-            if (gameConnection.connected && gameState.myPlayerId) {
-                gameConnection.sendPlayerInput(keys);
-            }
-            
-            // Actualización local para mejor responsividad
-            if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
-                const player = gameState.players.get(gameState.myPlayerId);
-                if (player.alive) {
-                    player.keys = {...keys};
-                }
-            }
+        if (dist < p1.radius + p2.radius) {
+          // MODIFICAR: Masa más realista basada en el área del círculo
+          const mass1 = Math.PI * p1.radius * p1.radius; // Área real del círculo
+          const mass2 = Math.PI * p2.radius * p2.radius;
+
+          // MODIFICAR: Fuerza basada en la apuesta y el tamaño
+          const strength1 =
+            (p1.powerup === "STRENGTH" ? 2.0 : 1.0) * p1.bet * 200; // Aumentado
+          const strength2 =
+            (p2.powerup === "STRENGTH" ? 2.0 : 1.0) * p2.bet * 200;
+
+          // Velocity-based momentum (players moving faster hit harder)
+          const velocity1 = Math.sqrt(p1.vx * p1.vx + p1.vy * p1.vy);
+          const velocity2 = Math.sqrt(p2.vx * p2.vx + p2.vy * p2.vy);
+          const momentumFactor1 = 1 + velocity1 * 0.5;
+          const momentumFactor2 = 1 + velocity2 * 0.5;
+
+          // Normalize collision vector
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Calculate impact forces with momentum
+          const force1 = strength1 * momentumFactor1;
+          const force2 = strength2 * momentumFactor2;
+
+          // Apply forces with mass consideration
+          const pushForce = 4.0; // Aumentado para hacer las colisiones más impactantes
+          p1.vx += nx * (force2 / mass1) * pushForce;
+          p1.vy += ny * (force2 / mass1) * pushForce;
+          p2.vx -= nx * (force1 / mass2) * pushForce;
+          p2.vy -= ny * (force1 / mass2) * pushForce;
+
+          // Separate players more aggressively
+          const overlap = p1.radius + p2.radius - dist + 2;
+          const separationForce = overlap * 0.6;
+          p1.x += nx * separationForce * (mass2 / (mass1 + mass2));
+          p1.y += ny * separationForce * (mass2 / (mass1 + mass2));
+          p2.x -= nx * separationForce * (mass1 / (mass1 + mass2));
+          p2.y -= ny * separationForce * (mass1 / (mass1 + mass2));
+
+          // Add screen shake effect for impact feedback
+          if (
+            p1.id === gameState.myPlayerId ||
+            p2.id === gameState.myPlayerId
+          ) {
+            shakeScreen();
+          }
         }
+      }
 
-        // Game loop
-        function gameLoop() {
-            update();
-            render();
-            requestAnimationFrame(gameLoop);
+      // AÑADIR: Colisiones suaves para sala de espera (modo offline)
+      function checkWaitingRoomCollisionOffline(p1, p2) {
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < p1.radius + p2.radius) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Separación suave
+          const overlap = p1.radius + p2.radius - dist + 1;
+          const separationForce = overlap * 0.3;
+
+          p1.x += nx * separationForce * 0.5;
+          p1.y += ny * separationForce * 0.5;
+          p2.x -= nx * separationForce * 0.5;
+          p2.y -= ny * separationForce * 0.5;
+
+          // Reducir velocidad
+          p1.vx *= 0.7;
+          p1.vy *= 0.7;
+          p2.vx *= 0.7;
+          p2.vy *= 0.7;
         }
+      }
 
-        function update() {
-            // Si el juego está en modo online, no actualizamos la física localmente
-            // Solo el servidor calcula la física y nos envía las actualizaciones
-            if (gameConnection.connected && (gameState.gameRunning || gameState.gamePhase === 'waiting')) {
-                // MODIFICAR: Aplicar predicción tanto en juego como en sala de espera
-                if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
-                    const player = gameState.players.get(gameState.myPlayerId);
-                    if (player.alive) {
-                        // Aplicar inputs locales (predicción cliente)
-                        if (gameState.gamePhase === 'waiting') {
-                            applyWaitingRoomInput(player);
-                        } else {
-                            applyPlayerInput(player);
-                        }
-                    }
-                }
-                return;
-            }
-            
-            // AÑADIR: Modo offline para sala de espera
-            if (gameState.gamePhase === 'waiting') {
-                updateWaitingRoomOffline();
-                return;
-            }
-            
-            // Modo offline: actualizar todo localmente como antes
-            if (!gameState.gameRunning) return;
-            
-            // Update players
-            gameState.players.forEach(player => {
-                if (!player.alive) return;
-                
-                // AI movement
-                if (player.isAI) {
-                    updateAI(player);
-                }
-                
-                // MODIFICAR: Movimiento ajustado por tamaño del jugador
-                const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7;
-                // Factor de masa más realista: jugadores más grandes son más lentos pero más fuertes
-                const mass = Math.pow(player.radius / 20, 1.5); // Más gradual que el anterior
-                const speed = baseSpeed / Math.sqrt(mass);
-                
-                if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed;
-                if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed;
-                if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed;
-                if (player.keys['d'] || player.keys['arrowright']) player.vx += speed;
-                
-                // Apply velocity
-                player.x += player.vx;
-                player.y += player.vy;
-                
-                // Reduced friction for more momentum
-                player.vx *= 0.92; // Was 0.85
-                player.vy *= 0.92;
-                
-                // Check ring boundaries with better elimination logic
-                const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
-                if (distFromCenter + player.radius > ringRadius) {
-                    // Give player a chance to recover if just touching edge
-                    if (distFromCenter + player.radius > ringRadius + 10) {
-                        player.alive = false;
-                        // MODIFICAR: Mejorar mensaje de eliminación
-                        const remainingAlive = getAlivePlayers().length - 1; // -1 porque este jugador aún cuenta como vivo en el array
-                        console.log(`Player ${player.address.substring(0, 8)} eliminated! ${remainingAlive} players remaining.`);
-                        
-                        // AÑADIR: Verificar inmediatamente si el juego debe terminar
-                        if (remainingAlive <= 1) {
-                            console.log('Verificación inmediata: Juego debe terminar por eliminación');
-                            // Pequeño delay para que la eliminación se procese visualmente
-                            setTimeout(() => {
-                                if (gameState.gameRunning) { // Solo si el juego aún está corriendo
-                                    endGame();
-                                }
-                            }, 100);
-                        }
-                    } else {
-                        // Push back toward center with strong force
-                        const pushAngle = Math.atan2(player.y - centerY, player.x - centerX);
-                        player.vx -= Math.cos(pushAngle) * 2;
-                        player.vy -= Math.sin(pushAngle) * 2;
-                    }
-                }
-                
-                // Check powerup expiration
-                if (player.powerupEndTime && Date.now() > player.powerupEndTime) {
-                    player.powerup = null;
-                    player.powerupEndTime = 0;
-                }
+      // Add screen shake for impact feedback
+      function shakeScreen() {
+        canvas.style.transform = `translate(${Math.random() * 4 - 2}px, ${
+          Math.random() * 4 - 2
+        }px)`;
+        setTimeout(() => {
+          canvas.style.transform = "translate(0, 0)";
+        }, 100);
+      }
 
-                // Actualizar rotación basada en movimiento
-                if (player.vx !== 0 || player.vy !== 0) {
-                    // Calcular dirección de movimiento
-                    player.rotation = Math.atan2(player.vy, player.vx);
-                    // Añadir variación en la rotación para efecto visual
-                    player.rotationSpeed = Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 0.01;
-                } else {
-                    // Reducir velocidad de rotación cuando está quieto
-                    player.rotationSpeed *= 0.95;
-                }
-            });
-            
-            // Collision detection
-            const playersArray = Array.from(gameState.players.values()).filter(p => p.alive);
-            for (let i = 0; i < playersArray.length; i++) {
-                for (let j = i + 1; j < playersArray.length; j++) {
-                    checkCollision(playersArray[i], playersArray[j]);
-                }
-            }
-            
-            // Powerup collisions - fixing the collection logic
-            for (let i = gameState.powerups.length - 1; i >= 0; i--) {
-                const powerup = gameState.powerups[i];
-                const playersArray = Array.from(gameState.players.values()).filter(p => p.alive);
-                
-                for (let j = 0; j < playersArray.length; j++) {
-                    const player = playersArray[j];
-                    const dist = Math.sqrt(Math.pow(player.x - powerup.x, 2) + Math.pow(player.y - powerup.y, 2));
-                    
-                    if (dist < player.radius + 15) {
-                        // Collect powerup
-                        player.powerup = powerup.type;
-                        player.powerupEndTime = Date.now() + POWERUP_TYPES[powerup.type].duration;
-                        
-                        // Remove from array safely
-                        gameState.powerups.splice(i, 1);
-                        
-                        // Show feedback
-                        if (player.id === gameState.myPlayerId) {
-                            showMessage(`Got ${powerup.type} powerup!`);
-                        }
-                        break; // Exit inner loop once powerup is collected
-                    }
-                }
-            }
-            
-            // Spawn powerups randomly
-            if (Math.random() < 0.01 && gameState.gamePhase === 'playing') {
-                spawnPowerup();
-            }
-        }
+      // MODIFICAR: Función de renderizado para usar imágenes base + overlays de powerups
+      function render() {
+        // Clear canvas
+        ctx.fillStyle = "#2d3748";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Nueva función para aplicar inputs de jugador (predicción cliente)
-        function applyPlayerInput(player) {
-            // Movimiento basado en las teclas presionadas
-            const baseSpeed = player.powerup === 'SPEED' ? 1.2 : 0.7;
-            // MODIFICAR: Factor de masa más realista basado en el tamaño
-            const mass = Math.pow(player.radius / 20, 1.5); // Más gradual
-            const speed = baseSpeed / Math.sqrt(mass);
-            
-            if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed * 0.5;
-            if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed * 0.5;
-            if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed * 0.5;
-            if (player.keys['d'] || player.keys['arrowright']) player.vx += speed * 0.5;
-            
-            // Aplicar velocidad (solo una fracción para evitar desincronización)
-            player.x += player.vx * 0.5;
-            player.y += player.vy * 0.5;
-        }
+        // Draw ring
+        ctx.strokeStyle = "#FFD700";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
 
-        // AÑADIR: Función para aplicar inputs en sala de espera
-        function applyWaitingRoomInput(player) {
-            const baseSpeed = 0.4; // Velocidad reducida
-            // MODIFICAR: Factor de masa más realista
-            const mass = Math.pow(player.radius / 20, 1.5);
-            const speed = baseSpeed / Math.sqrt(mass);
-            
-            if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed * 0.3;
-            if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed * 0.3;
-            if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed * 0.3;
-            if (player.keys['d'] || player.keys['arrowright']) player.vx += speed * 0.3;
-            
-            // Aplicar velocidad (predicción suave)
-            player.x += player.vx * 0.3;
-            player.y += player.vy * 0.3;
-        }
+        // Draw multiple danger zones for better visual feedback
+        const dangerZones = [
+          { radius: ringRadius - 20, color: "#ff6666", alpha: 0.3 },
+          { radius: ringRadius - 40, color: "#ff4444", alpha: 0.2 },
+          { radius: ringRadius - 60, color: "#ff2222", alpha: 0.1 },
+        ];
 
-        function updateAI(player) {
-            // Simple AI: move toward center and avoid edges
-            const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
-            
-            if (distFromCenter > ringRadius * 0.7) {
-                // Move toward center
-                const angle = Math.atan2(centerY - player.y, centerX - player.x);
-                player.keys = {
-                    w: Math.sin(angle) < -0.3,
-                    s: Math.sin(angle) > 0.3,
-                    a: Math.cos(angle) < -0.3,
-                    d: Math.cos(angle) > 0.3
-                };
-            } else {
-                // Random movement
-                if (Math.random() < 0.1) {
-                    player.keys = {
-                        w: Math.random() < 0.25,
-                        s: Math.random() < 0.25,
-                        a: Math.random() < 0.25,
-                        d: Math.random() < 0.25
-                    };
-                }
-            }
-        }
+        dangerZones.forEach((zone) => {
+          ctx.strokeStyle = zone.color;
+          ctx.globalAlpha = zone.alpha;
+          ctx.lineWidth = 3;
+          ctx.setLineDash([8, 4]);
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, zone.radius, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+        ctx.globalAlpha = 1.0;
+        ctx.setLineDash([]);
 
-        // AÑADIR: Actualización de sala de espera en modo offline
-        function updateWaitingRoomOffline() {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const ringRadius = 280;
-            
-            // Actualizar jugadores en sala de espera
-            gameState.players.forEach(player => {
-                if (!player.alive) return;
-                
-                // AI movement (si aplica)
-                if (player.isAI) {
-                    updateAIWaitingRoom(player);
-                }
-                
-                // MODIFICAR: Movimiento ajustado por tamaño en sala de espera
-                const baseSpeed = 0.4;
-                const mass = Math.pow(player.radius / 20, 1.5);
-                const speed = baseSpeed / Math.sqrt(mass);
-                
-                if (player.keys['w'] || player.keys['arrowup']) player.vy -= speed;
-                if (player.keys['s'] || player.keys['arrowdown']) player.vy += speed;
-                if (player.keys['a'] || player.keys['arrowleft']) player.vx -= speed;
-                if (player.keys['d'] || player.keys['arrowright']) player.vx += speed;
-                
-                // Aplicar velocidad
-                player.x += player.vx;
-                player.y += player.vy;
-                
-                // Fricción aumentada
-                player.vx *= 0.85;
-                player.vy *= 0.85;
-                
-                // Mantener dentro del ring con rebote suave
-                const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
-                if (distFromCenter + player.radius > ringRadius) {
-                    const pushAngle = Math.atan2(player.y - centerY, player.x - centerX);
-                    player.vx -= Math.cos(pushAngle) * 1.5;
-                    player.vy -= Math.sin(pushAngle) * 1.5;
-                    
-                    if (distFromCenter + player.radius > ringRadius + 20) {
-                        const newDist = ringRadius - player.radius - 10;
-                        player.x = centerX + Math.cos(pushAngle) * newDist;
-                        player.y = centerY + Math.sin(pushAngle) * newDist;
-                    }
-                }
-                
-                // Actualizar rotación
-                if (player.vx !== 0 || player.vy !== 0) {
-                    player.rotation = Math.atan2(player.vy, player.vx);
-                    player.rotationSpeed = Math.sqrt(player.vx * player.vx + player.vy * player.vy) * 0.01;
-                } else {
-                    player.rotationSpeed *= 0.95;
-                }
-            });
-            
-            // Colisiones suaves entre jugadores
-            const playersArray = Array.from(gameState.players.values()).filter(p => p.alive);
-            for (let i = 0; i < playersArray.length; i++) {
-                for (let j = i + 1; j < playersArray.length; j++) {
-                    checkWaitingRoomCollisionOffline(playersArray[i], playersArray[j]);
-                }
-            }
-        }
+        // Draw powerups
+        gameState.powerups.forEach((powerup) => {
+          const type = POWERUP_TYPES[powerup.type];
+          ctx.fillStyle = type.color;
+          ctx.beginPath();
+          ctx.arc(powerup.x, powerup.y, 15, 0, Math.PI * 2);
+          ctx.fill();
 
-        // AÑADIR: AI simplificado para sala de espera
-        function updateAIWaitingRoom(player) {
-            // Movimiento más calmado en sala de espera
-            if (Math.random() < 0.05) { // Menos frecuente
-                player.keys = {
-                    w: Math.random() < 0.15,
-                    s: Math.random() < 0.15,
-                    a: Math.random() < 0.15,
-                    d: Math.random() < 0.15
-                };
-            }
-        }
+          // Draw emoji
+          ctx.font = "20px Arial";
+          ctx.textAlign = "center";
+          ctx.fillStyle = "white";
+          ctx.fillText(type.emoji, powerup.x, powerup.y + 7);
+        });
 
-        function checkCollision(p1, p2) {
-            const dx = p1.x - p2.x;
-            const dy = p1.y - p2.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist < p1.radius + p2.radius) {
-                // MODIFICAR: Masa más realista basada en el área del círculo
-                const mass1 = Math.PI * p1.radius * p1.radius; // Área real del círculo
-                const mass2 = Math.PI * p2.radius * p2.radius;
-                
-                // MODIFICAR: Fuerza basada en la apuesta y el tamaño
-                const strength1 = (p1.powerup === 'STRENGTH' ? 2.0 : 1.0) * p1.bet * 200; // Aumentado
-                const strength2 = (p2.powerup === 'STRENGTH' ? 2.0 : 1.0) * p2.bet * 200;
-                
-                // Velocity-based momentum (players moving faster hit harder)
-                const velocity1 = Math.sqrt(p1.vx * p1.vx + p1.vy * p1.vy);
-                const velocity2 = Math.sqrt(p2.vx * p2.vx + p2.vy * p2.vy);
-                const momentumFactor1 = 1 + velocity1 * 0.5;
-                const momentumFactor2 = 1 + velocity2 * 0.5;
-                
-                // Normalize collision vector
-                const nx = dx / dist;
-                const ny = dy / dist;
-                
-                // Calculate impact forces with momentum
-                const force1 = strength1 * momentumFactor1;
-                const force2 = strength2 * momentumFactor2;
-                
-                // Apply forces with mass consideration
-                const pushForce = 4.0; // Aumentado para hacer las colisiones más impactantes
-                p1.vx += nx * (force2 / mass1) * pushForce;
-                p1.vy += ny * (force2 / mass1) * pushForce;
-                p2.vx -= nx * (force1 / mass2) * pushForce;
-                p2.vy -= ny * (force1 / mass2) * pushForce;
-                
-                // Separate players more aggressively
-                const overlap = (p1.radius + p2.radius) - dist + 2;
-                const separationForce = overlap * 0.6;
-                p1.x += nx * separationForce * (mass2 / (mass1 + mass2));
-                p1.y += ny * separationForce * (mass2 / (mass1 + mass2));
-                p2.x -= nx * separationForce * (mass1 / (mass1 + mass2));
-                p2.y -= ny * separationForce * (mass1 / (mass1 + mass2));
-                
-                // Add screen shake effect for impact feedback
-                if (p1.id === gameState.myPlayerId || p2.id === gameState.myPlayerId) {
-                    shakeScreen();
-                }
-            }
-        }
+        // Draw players with base images + powerup overlays
+        gameState.players.forEach((player) => {
+          if (!player.alive) return;
 
-        // AÑADIR: Colisiones suaves para sala de espera (modo offline)
-        function checkWaitingRoomCollisionOffline(p1, p2) {
-            const dx = p1.x - p2.x;
-            const dy = p1.y - p2.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist < p1.radius + p2.radius) {
-                const nx = dx / dist;
-                const ny = dy / dist;
-                
-                // Separación suave
-                const overlap = (p1.radius + p2.radius) - dist + 1;
-                const separationForce = overlap * 0.3;
-                
-                p1.x += nx * separationForce * 0.5;
-                p1.y += ny * separationForce * 0.5;
-                p2.x -= nx * separationForce * 0.5;
-                p2.y -= ny * separationForce * 0.5;
-                
-                // Reducir velocidad
-                p1.vx *= 0.7;
-                p1.vy *= 0.7;
-                p2.vx *= 0.7;
-                p2.vy *= 0.7;
-            }
-        }
-
-        // Add screen shake for impact feedback
-        function shakeScreen() {
-            canvas.style.transform = `translate(${Math.random() * 4 - 2}px, ${Math.random() * 4 - 2}px)`;
-            setTimeout(() => {
-                canvas.style.transform = 'translate(0, 0)';
-            }, 100);
-        }
-
-        // MODIFICAR: Función de renderizado para usar imágenes base + overlays de powerups
-        function render() {
-            // Clear canvas
-            ctx.fillStyle = '#2d3748';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw ring
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 5;
+          // Show velocity trails for moving players
+          const speed = Math.sqrt(
+            player.vx * player.vx + player.vy * player.vy
+          );
+          if (speed > 0.5) {
+            ctx.strokeStyle = player.color;
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = player.radius / 3;
             ctx.beginPath();
-            ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(player.x - player.vx * 3, player.y - player.vy * 3);
             ctx.stroke();
-            
-            // Draw multiple danger zones for better visual feedback
-            const dangerZones = [
-                { radius: ringRadius - 20, color: '#ff6666', alpha: 0.3 },
-                { radius: ringRadius - 40, color: '#ff4444', alpha: 0.2 },
-                { radius: ringRadius - 60, color: '#ff2222', alpha: 0.1 }
-            ];
-            
-            dangerZones.forEach(zone => {
-                ctx.strokeStyle = zone.color;
-                ctx.globalAlpha = zone.alpha;
-                ctx.lineWidth = 3;
-                ctx.setLineDash([8, 4]);
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, zone.radius, 0, Math.PI * 2);
-                ctx.stroke();
-            });
             ctx.globalAlpha = 1.0;
-            ctx.setLineDash([]);
-            
-            // Draw powerups
-            gameState.powerups.forEach(powerup => {
-                const type = POWERUP_TYPES[powerup.type];
-                ctx.fillStyle = type.color;
-                ctx.beginPath();
-                ctx.arc(powerup.x, powerup.y, 15, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw emoji
-                ctx.font = '20px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillStyle = 'white';
-                ctx.fillText(type.emoji, powerup.x, powerup.y + 7);
-            });
-            
-            // Draw players with base images + powerup overlays
-            gameState.players.forEach(player => {
-                if (!player.alive) return;
-                
-                // Show velocity trails for moving players
-                const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
-                if (speed > 0.5) {
-                    ctx.strokeStyle = player.color;
-                    ctx.globalAlpha = 0.3;
-                    ctx.lineWidth = player.radius / 3;
-                    ctx.beginPath();
-                    ctx.moveTo(player.x, player.y);
-                    ctx.lineTo(player.x - player.vx * 3, player.y - player.vy * 3);
-                    ctx.stroke();
-                    ctx.globalAlpha = 1.0;
-                }
-                
-                // NUEVO: Siempre usar la imagen base del personaje
-                let baseImage = sumoImages[`character${player.characterIndex}`] || sumoImages.character1;
-                
-                // Asegurar que la imagen existe, si no usar default
-                if (!baseImage || !baseImage.complete) {
-                    baseImage = sumoImages.character1;
-                }
-                
-                // NUEVO: Determinar imagen overlay de powerup si existe
-                let overlayImage = null;
-                if (player.powerup) {
-                    switch (player.powerup) {
-                        case 'STRENGTH':
-                            overlayImage = sumoImages.strengthOverlay;
-                            break;
-                        case 'SPEED':
-                            overlayImage = sumoImages.speedOverlay;
-                            break;
-                        case 'SHIELD':
-                            overlayImage = sumoImages.shieldOverlay;
-                            break;
-                        case 'MAGNET':
-                            overlayImage = sumoImages.magnetOverlay;
-                            break;
-                    }
-                }
-                
-                // MODIFICAR: Efectos visuales mejorados para powerups
-                let glowIntensity = player.radius / 2;
-                let glowColor = player.color;
-                
-                if (player.powerup) {
-                    glowIntensity = player.radius * 1.2;
-                    switch (player.powerup) {
-                        case 'STRENGTH':
-                            glowColor = '#ff4444';
-                            break;
-                        case 'SPEED':
-                            glowColor = '#44ff44';
-                            break;
-                        case 'SHIELD':
-                            glowColor = '#4444ff';
-                            break;
-                        case 'MAGNET':
-                            glowColor = '#ff44ff';
-                            break;
-                        default:
-                            glowColor = player.color;
-                    }
-                }
-                
-                // Dibujar sombra/glow
-                ctx.shadowColor = glowColor;
-                ctx.shadowBlur = glowIntensity;
-                
-                // Guardar contexto antes de rotar
-                ctx.save();
-                
-                // Trasladar al centro del jugador
-                ctx.translate(player.x, player.y);
-                
-                // Rotar según la dirección de movimiento
-                ctx.rotate(player.rotation);
-                
-                // AÑADIR: Efecto de pulsación para powerups
-                let sizeMultiplier = 2.2;
-                if (player.powerup) {
-                    // Crear efecto de pulsación basado en el tiempo
-                    const pulseTime = Date.now() * 0.005;
-                    sizeMultiplier = 2.2 + Math.sin(pulseTime) * 0.1;
-                }
-                
-                // NUEVO: Dibujar la imagen base del personaje SIEMPRE
-                const size = player.radius * sizeMultiplier;
-                ctx.drawImage(baseImage, -size/2, -size/2, size, size);
-                
-                // NUEVO: Dibujar overlay de powerup si existe y está cargado
-                if (overlayImage && overlayImage.complete) {
-                    // Ajustar opacidad del overlay para efecto de mezcla
-                    ctx.globalAlpha = 0.7;
-                    ctx.drawImage(overlayImage, -size/2, -size/2, size, size);
-                    ctx.globalAlpha = 1.0;
-                }
-                
-                // Restaurar contexto
-                ctx.restore();
-                ctx.shadowBlur = 0;
-                
-                // MANTENER: Efectos adicionales para powerups específicos
-                if (player.powerup === 'SHIELD') {
-                    // Dibujar escudo protector animado
-                    const shieldTime = Date.now() * 0.003;
-                    ctx.strokeStyle = '#4444ff';
-                    ctx.lineWidth = 4;
-                    ctx.globalAlpha = 0.7 + Math.sin(shieldTime) * 0.3;
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius + 8 + Math.sin(shieldTime) * 2, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.globalAlpha = 1.0;
-                }
-                
-                if (player.powerup === 'SPEED') {
-                    // Dibujar líneas de velocidad
-                    const speedLines = 6;
-                    ctx.strokeStyle = '#44ff44';
-                    ctx.lineWidth = 2;
-                    ctx.globalAlpha = 0.6;
-                    
-                    for (let i = 0; i < speedLines; i++) {
-                        const angle = (Math.PI * 2 * i) / speedLines + Date.now() * 0.01;
-                        const lineLength = player.radius + 15;
-                        const startX = player.x + Math.cos(angle) * player.radius;
-                        const startY = player.y + Math.sin(angle) * player.radius;
-                        const endX = player.x + Math.cos(angle) * lineLength;
-                        const endY = player.y + Math.sin(angle) * lineLength;
-                        
-                        ctx.beginPath();
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-                    }
-                    ctx.globalAlpha = 1.0;
-                }
-                
-                if (player.powerup === 'STRENGTH') {
-                    // Dibujar partículas de fuerza
-                    const strengthTime = Date.now() * 0.008;
-                    const particles = 8;
-                    ctx.fillStyle = '#ff4444';
-                    ctx.globalAlpha = 0.8;
-                    
-                    for (let i = 0; i < particles; i++) {
-                        const angle = (Math.PI * 2 * i) / particles + strengthTime;
-                        const distance = player.radius + 12 + Math.sin(strengthTime + i) * 8;
-                        const particleX = player.x + Math.cos(angle) * distance;
-                        const particleY = player.y + Math.sin(angle) * distance;
-                        const particleSize = 3 + Math.sin(strengthTime * 2 + i) * 2;
-                        
-                        ctx.beginPath();
-                        ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                    ctx.globalAlpha = 1.0;
-                }
-                
-                if (player.powerup === 'MAGNET') {
-                    // Dibujar ondas magnéticas
-                    const magnetTime = Date.now() * 0.004;
-                    ctx.strokeStyle = '#ff44ff';
-                    ctx.lineWidth = 2;
-                    
-                    for (let i = 1; i <= 3; i++) {
-                        ctx.globalAlpha = 0.5 - (i * 0.1);
-                        const waveRadius = player.radius + (i * 15) + Math.sin(magnetTime + i) * 5;
-                        ctx.beginPath();
-                        ctx.arc(player.x, player.y, waveRadius, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                    ctx.globalAlpha = 1.0;
-                }
-                
-                // Show danger indicator when near edge
-                const distFromCenter = Math.sqrt(Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2));
-                if (distFromCenter + player.radius > ringRadius - 50) {
-                    ctx.strokeStyle = '#ff0000';
-                    ctx.lineWidth = 3;
-                    ctx.setLineDash([2, 2]);
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius + 2, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-                
-                // Player bet amount
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px Arial';
-                ctx.textAlign = 'center';
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.strokeText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
-                ctx.fillText(player.bet.toFixed(3), player.x, player.y + player.radius + 15);
-                
-                // MANTENER: Powerup indicator mejorado
-                if (player.powerup) {
-                    const type = POWERUP_TYPES[player.powerup];
-                    
-                    // Fondo del indicador
-                    ctx.fillStyle = type.color;
-                    ctx.globalAlpha = 0.8;
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y - player.radius - 15, 12, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.globalAlpha = 1.0;
-                    
-                    // Emoji del powerup
-                    ctx.font = '16px Arial';
-                    ctx.fillStyle = 'white';
-                    ctx.fillText(type.emoji, player.x, player.y - player.radius - 10);
-                    
-                    // Barra de tiempo restante
-                    if (player.powerupEndTime) {
-                        const remainingTime = Math.max(0, player.powerupEndTime - Date.now());
-                        const totalTime = type.duration;
-                        const timePercent = remainingTime / totalTime;
-                        
-                        if (timePercent > 0) {
-                            const barWidth = 30;
-                            const barHeight = 4;
-                            const barX = player.x - barWidth / 2;
-                            const barY = player.y - player.radius - 30;
-                            
-                            // Fondo de la barra
-                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                            ctx.fillRect(barX, barY, barWidth, barHeight);
-                            
-                            // Barra de progreso
-                            ctx.fillStyle = type.color;
-                            ctx.fillRect(barX, barY, barWidth * timePercent, barHeight);
-                        }
-                    }
-                }
-                
-                // Player is you indicator
-                if (player.id === gameState.myPlayerId) {
-                    ctx.strokeStyle = '#FFD700';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius + 3, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Mostrar número de personaje para debug
-                if (GAME_CONFIG.testMode) {
-                    ctx.fillStyle = '#FFD700';
-                    ctx.font = 'bold 10px Arial';
-                    ctx.fillText(`P${player.characterIndex}`, player.x, player.y - player.radius - 35);
-                }
-            });
-            
-            // Draw countdown
-            if (gameState.gamePhase === 'countdown') {
-                ctx.fillStyle = '#FFD700';
-                ctx.font = '72px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(gameState.countdown || 'FIGHT!', centerX, centerY);
+          }
+
+          // NUEVO: Siempre usar la imagen base del personaje
+          let baseImage =
+            sumoImages[`character${player.characterIndex}`] ||
+            sumoImages.character1;
+
+          // Asegurar que la imagen existe, si no usar default
+          if (!baseImage || !baseImage.complete) {
+            baseImage = sumoImages.character1;
+          }
+
+          // NUEVO: Determinar imagen overlay de powerup si existe
+          let overlayImage = null;
+          if (player.powerup) {
+            switch (player.powerup) {
+              case "STRENGTH":
+                overlayImage = sumoImages.strengthOverlay;
+                break;
+              case "SPEED":
+                overlayImage = sumoImages.speedOverlay;
+                break;
+              case "SHIELD":
+                overlayImage = sumoImages.shieldOverlay;
+                break;
+              case "MAGNET":
+                overlayImage = sumoImages.magnetOverlay;
+                break;
             }
+          }
+
+          // MODIFICAR: Efectos visuales mejorados para powerups
+          let glowIntensity = player.radius / 2;
+          let glowColor = player.color;
+
+          if (player.powerup) {
+            glowIntensity = player.radius * 1.2;
+            switch (player.powerup) {
+              case "STRENGTH":
+                glowColor = "#ff4444";
+                break;
+              case "SPEED":
+                glowColor = "#44ff44";
+                break;
+              case "SHIELD":
+                glowColor = "#4444ff";
+                break;
+              case "MAGNET":
+                glowColor = "#ff44ff";
+                break;
+              default:
+                glowColor = player.color;
+            }
+          }
+
+          // Dibujar sombra/glow
+          ctx.shadowColor = glowColor;
+          ctx.shadowBlur = glowIntensity;
+
+          // Guardar contexto antes de rotar
+          ctx.save();
+
+          // Trasladar al centro del jugador
+          ctx.translate(player.x, player.y);
+
+          // Rotar según la dirección de movimiento
+          ctx.rotate(player.rotation);
+
+          // AÑADIR: Efecto de pulsación para powerups
+          let sizeMultiplier = 2.2;
+          if (player.powerup) {
+            // Crear efecto de pulsación basado en el tiempo
+            const pulseTime = Date.now() * 0.005;
+            sizeMultiplier = 2.2 + Math.sin(pulseTime) * 0.1;
+          }
+
+          // NUEVO: Dibujar la imagen base del personaje SIEMPRE
+          const size = player.radius * sizeMultiplier;
+          ctx.drawImage(baseImage, -size / 2, -size / 2, size, size);
+
+          // NUEVO: Dibujar overlay de powerup si existe y está cargado
+          if (overlayImage && overlayImage.complete) {
+            // Ajustar opacidad del overlay para efecto de mezcla
+            ctx.globalAlpha = 0.7;
+            ctx.drawImage(overlayImage, -size / 2, -size / 2, size, size);
+            ctx.globalAlpha = 1.0;
+          }
+
+          // Restaurar contexto
+          ctx.restore();
+          ctx.shadowBlur = 0;
+
+          // MANTENER: Efectos adicionales para powerups específicos
+          if (player.powerup === "SHIELD") {
+            // Dibujar escudo protector animado
+            const shieldTime = Date.now() * 0.003;
+            ctx.strokeStyle = "#4444ff";
+            ctx.lineWidth = 4;
+            ctx.globalAlpha = 0.7 + Math.sin(shieldTime) * 0.3;
+            ctx.beginPath();
+            ctx.arc(
+              player.x,
+              player.y,
+              player.radius + 8 + Math.sin(shieldTime) * 2,
+              0,
+              Math.PI * 2
+            );
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+          }
+
+          if (player.powerup === "SPEED") {
+            // Dibujar líneas de velocidad
+            const speedLines = 6;
+            ctx.strokeStyle = "#44ff44";
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.6;
+
+            for (let i = 0; i < speedLines; i++) {
+              const angle = (Math.PI * 2 * i) / speedLines + Date.now() * 0.01;
+              const lineLength = player.radius + 15;
+              const startX = player.x + Math.cos(angle) * player.radius;
+              const startY = player.y + Math.sin(angle) * player.radius;
+              const endX = player.x + Math.cos(angle) * lineLength;
+              const endY = player.y + Math.sin(angle) * lineLength;
+
+              ctx.beginPath();
+              ctx.moveTo(startX, startY);
+              ctx.lineTo(endX, endY);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1.0;
+          }
+
+          if (player.powerup === "STRENGTH") {
+            // Dibujar partículas de fuerza
+            const strengthTime = Date.now() * 0.008;
+            const particles = 8;
+            ctx.fillStyle = "#ff4444";
+            ctx.globalAlpha = 0.8;
+
+            for (let i = 0; i < particles; i++) {
+              const angle = (Math.PI * 2 * i) / particles + strengthTime;
+              const distance =
+                player.radius + 12 + Math.sin(strengthTime + i) * 8;
+              const particleX = player.x + Math.cos(angle) * distance;
+              const particleY = player.y + Math.sin(angle) * distance;
+              const particleSize = 3 + Math.sin(strengthTime * 2 + i) * 2;
+
+              ctx.beginPath();
+              ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+          }
+
+          if (player.powerup === "MAGNET") {
+            // Dibujar ondas magnéticas
+            const magnetTime = Date.now() * 0.004;
+            ctx.strokeStyle = "#ff44ff";
+            ctx.lineWidth = 2;
+
+            for (let i = 1; i <= 3; i++) {
+              ctx.globalAlpha = 0.5 - i * 0.1;
+              const waveRadius =
+                player.radius + i * 15 + Math.sin(magnetTime + i) * 5;
+              ctx.beginPath();
+              ctx.arc(player.x, player.y, waveRadius, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1.0;
+          }
+
+          // Show danger indicator when near edge
+          const distFromCenter = Math.sqrt(
+            Math.pow(player.x - centerX, 2) + Math.pow(player.y - centerY, 2)
+          );
+          if (distFromCenter + player.radius > ringRadius - 50) {
+            ctx.strokeStyle = "#ff0000";
+            ctx.lineWidth = 3;
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius + 2, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+
+          // Player bet amount
+          ctx.fillStyle = "white";
+          ctx.font = "bold 12px Arial";
+          ctx.textAlign = "center";
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 2;
+          ctx.strokeText(
+            player.bet.toFixed(3),
+            player.x,
+            player.y + player.radius + 15
+          );
+          ctx.fillText(
+            player.bet.toFixed(3),
+            player.x,
+            player.y + player.radius + 15
+          );
+
+          // MANTENER: Powerup indicator mejorado
+          if (player.powerup) {
+            const type = POWERUP_TYPES[player.powerup];
+
+            // Fondo del indicador
+            ctx.fillStyle = type.color;
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            ctx.arc(
+              player.x,
+              player.y - player.radius - 15,
+              12,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Emoji del powerup
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText(type.emoji, player.x, player.y - player.radius - 10);
+
+            // Barra de tiempo restante
+            if (player.powerupEndTime) {
+              const remainingTime = Math.max(
+                0,
+                player.powerupEndTime - Date.now()
+              );
+              const totalTime = type.duration;
+              const timePercent = remainingTime / totalTime;
+
+              if (timePercent > 0) {
+                const barWidth = 30;
+                const barHeight = 4;
+                const barX = player.x - barWidth / 2;
+                const barY = player.y - player.radius - 30;
+
+                // Fondo de la barra
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                // Barra de progreso
+                ctx.fillStyle = type.color;
+                ctx.fillRect(barX, barY, barWidth * timePercent, barHeight);
+              }
+            }
+          }
+
+          // Player is you indicator
+          if (player.id === gameState.myPlayerId) {
+            ctx.strokeStyle = "#FFD700";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Mostrar número de personaje para debug
+          if (GAME_CONFIG.testMode) {
+            ctx.fillStyle = "#FFD700";
+            ctx.font = "bold 10px Arial";
+            ctx.fillText(
+              `P${player.characterIndex}`,
+              player.x,
+              player.y - player.radius - 35
+            );
+          }
+        });
+
+        // Draw countdown
+        if (gameState.gamePhase === "countdown") {
+          ctx.fillStyle = "#FFD700";
+          ctx.font = "72px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(gameState.countdown || "FIGHT!", centerX, centerY);
+        }
+      }
+
+      // AÑADIR función para mostrar estadísticas en modo debug
+      function updateUI() {
+        document.getElementById("prizePool").textContent =
+          gameState.prizePool.toFixed(3);
+        document.getElementById("playerCount").textContent =
+          gameState.players.size;
+
+        // Update timer
+        if (gameState.gamePhase === "countdown") {
+          document.getElementById("gameTimer").textContent =
+            gameState.countdown || "FIGHT!";
+        } else if (gameState.gamePhase === "playing") {
+          const alivePlayers = getAlivePlayers();
+          let timerText = `${gameState.gameTime}s`;
+
+          // Mostrar información de jugadores vivos
+          timerText += ` (${alivePlayers.length} alive)`;
+
+          // AÑADIR: Indicador especial cuando queda un solo jugador
+          if (alivePlayers.length === 1) {
+            timerText += " 🏆 WINNER!";
+          }
+
+          // En modo de prueba, mostrar información adicional
+          if (GAME_CONFIG.testMode) {
+            if (alivePlayers.length === 1) {
+              timerText += " [TEST MODE - SUCCESS]";
+            } else {
+              timerText += " [TEST MODE]";
+            }
+          }
+
+          document.getElementById("gameTimer").textContent = timerText;
+        } else if (gameState.gamePhase === "waiting") {
+          document.getElementById("gameTimer").textContent =
+            "Waiting... (Use WASD to move)";
+        } else if (gameState.gamePhase === "finished") {
+          const alivePlayers = getAlivePlayers();
+          if (alivePlayers.length === 1) {
+            document.getElementById(
+              "gameTimer"
+            ).textContent = `🏆 Winner: ${alivePlayers[0].address.substring(
+              0,
+              8
+            )}...`;
+          } else {
+            document.getElementById("gameTimer").textContent = "Game Finished";
+          }
+        } else {
+          document.getElementById("gameTimer").textContent = "Waiting...";
         }
 
-        // AÑADIR función para mostrar estadísticas en modo debug
-        function updateUI() {
-            document.getElementById('prizePool').textContent = gameState.prizePool.toFixed(3);
-            document.getElementById('playerCount').textContent = gameState.players.size;
-            
-            // Update timer
-            if (gameState.gamePhase === 'countdown') {
-                document.getElementById('gameTimer').textContent = gameState.countdown || 'FIGHT!';
-            } else if (gameState.gamePhase === 'playing') {
-                const alivePlayers = getAlivePlayers();
-                let timerText = `${gameState.gameTime}s`;
-                
-                // Mostrar información de jugadores vivos
-                timerText += ` (${alivePlayers.length} alive)`;
-                
-                // AÑADIR: Indicador especial cuando queda un solo jugador
-                if (alivePlayers.length === 1) {
-                    timerText += ' 🏆 WINNER!';
-                }
-                
-                // En modo de prueba, mostrar información adicional
-                if (GAME_CONFIG.testMode) {
-                    if (alivePlayers.length === 1) {
-                        timerText += ' [TEST MODE - SUCCESS]';
-                    } else {
-                        timerText += ' [TEST MODE]';
-                    }
-                }
-                
-                document.getElementById('gameTimer').textContent = timerText;
-            } else if (gameState.gamePhase === 'waiting') {
-                document.getElementById('gameTimer').textContent = 'Waiting... (Use WASD to move)';
-            } else if (gameState.gamePhase === 'finished') {
-                const alivePlayers = getAlivePlayers();
-                if (alivePlayers.length === 1) {
-                    document.getElementById('gameTimer').textContent = `🏆 Winner: ${alivePlayers[0].address.substring(0, 8)}...`;
-                } else {
-                    document.getElementById('gameTimer').textContent = 'Game Finished';
-                }
-            } else {
-                document.getElementById('gameTimer').textContent = 'Waiting...';
-            }
-            
-            // Update player list
-            const playerList = document.getElementById('playerList');
-            playerList.innerHTML = '';
-            gameState.players.forEach(player => {
-                const card = document.createElement('div');
-                card.className = 'player-card';
-                card.style.opacity = player.alive ? '1.0' : '0.5'; // Dim eliminated players
-                
-                // AÑADIR: Destacar al ganador
-                if (player.alive && getAlivePlayers().length === 1 && gameState.gamePhase === 'playing') {
-                    card.style.border = '2px solid #FFD700';
-                    card.style.background = 'rgba(255, 215, 0, 0.2)';
-                }
-                
-                // MODIFICAR: Mostrar información del tamaño
-                const sizeInfo = `(Size: ${player.radius.toFixed(0)})`;
-                
-                card.innerHTML = `
+        // Update player list
+        const playerList = document.getElementById("playerList");
+        playerList.innerHTML = "";
+        gameState.players.forEach((player) => {
+          const card = document.createElement("div");
+          card.className = "player-card";
+          card.style.opacity = player.alive ? "1.0" : "0.5"; // Dim eliminated players
+
+          // AÑADIR: Destacar al ganador
+          if (
+            player.alive &&
+            getAlivePlayers().length === 1 &&
+            gameState.gamePhase === "playing"
+          ) {
+            card.style.border = "2px solid #FFD700";
+            card.style.background = "rgba(255, 215, 0, 0.2)";
+          }
+
+          // MODIFICAR: Mostrar información del tamaño
+          const sizeInfo = `(Size: ${player.radius.toFixed(0)})`;
+
+          card.innerHTML = `
                     <div style="color: ${player.color}">●</div>
                     <div>${player.address.substring(0, 6)}...</div>
                     <div>${player.bet.toFixed(3)} FLOW</div>
                     <div style="font-size: 10px; color: #ccc;">${sizeInfo}</div>
-                    <div>${player.alive ? (getAlivePlayers().length === 1 && gameState.gamePhase === 'playing' ? '👑' : '🟢') : '💀'}</div>
+                    <div>${
+                      player.alive
+                        ? getAlivePlayers().length === 1 &&
+                          gameState.gamePhase === "playing"
+                          ? "👑"
+                          : "🟢"
+                        : "💀"
+                    }</div>
                 `;
-                playerList.appendChild(card);
-            });
+          playerList.appendChild(card);
+        });
+      }
+
+      function getAlivePlayers() {
+        return Array.from(gameState.players.values()).filter((p) => p.alive);
+      }
+
+      // Update UI periodically
+      setInterval(updateUI, 100);
+
+      function spawnPowerup() {
+        if (gameState.powerups.length < 3) {
+          const types = Object.keys(POWERUP_TYPES);
+          const type = types[Math.floor(Math.random() * types.length)];
+
+          // Spawn inside the ring but not too close to center
+          const angle = Math.random() * Math.PI * 2;
+          const minRadius = ringRadius * 0.2; // Minimum distance from center
+          const maxRadius = ringRadius * 0.7; // Not too close to edge
+          const distance = minRadius + Math.random() * (maxRadius - minRadius);
+
+          gameState.powerups.push({
+            type: type,
+            x: centerX + Math.cos(angle) * distance,
+            y: centerY + Math.sin(angle) * distance,
+            rotation: 0,
+          });
+        }
+      }
+
+      // Add a simple message display function
+      function showMessage(text, duration = 2000) {
+        const message = document.createElement("div");
+        message.style.position = "absolute";
+        message.style.top = "20px";
+        message.style.left = "50%";
+        message.style.transform = "translateX(-50%)";
+        message.style.background = "rgba(0,0,0,0.7)";
+        message.style.color = "white";
+        message.style.padding = "10px 20px";
+        message.style.borderRadius = "20px";
+        message.style.fontWeight = "bold";
+        message.style.zIndex = "1000";
+        message.textContent = text;
+
+        document.body.appendChild(message);
+
+        setTimeout(() => {
+          message.style.opacity = "0";
+          message.style.transition = "opacity 0.5s";
+          setTimeout(() => document.body.removeChild(message), 500);
+        }, duration);
+      }
+
+      // Añadir esta nueva función
+      function updateGameStateFromServer(serverState) {
+        console.log("Estado recibido del servidor:", serverState);
+        console.log("Número de jugadores:", serverState.players.length);
+        console.log("Fase del juego:", serverState.gamePhase);
+        console.log("Juego corriendo:", serverState.gameRunning);
+
+        // Actualizar el estado del juego con los datos del servidor
+        gameState.gameRunning = serverState.gameRunning;
+        gameState.gamePhase = serverState.gamePhase;
+        gameState.prizePool = serverState.prizePool;
+        gameState.countdown = serverState.countdown;
+        gameState.gameTime = serverState.gameTime;
+
+        // Actualizar tracking de personajes basado en los jugadores del servidor
+        assignedCharacters.clear();
+
+        // Convertir el array de jugadores en un Map
+        const newPlayers = new Map();
+        serverState.players.forEach((player) => {
+          // Asegurar que el jugador tenga un personaje asignado
+          if (!player.characterIndex) {
+            player.characterIndex = getNextAvailableCharacter();
+          } else {
+            assignedCharacters.add(player.characterIndex);
+          }
+
+          newPlayers.set(player.id, player);
+
+          // Si este jugador soy yo, guardar mi ID
+          if (player.address === walletAddress) {
+            gameState.myPlayerId = player.id;
+          }
+        });
+        gameState.players = newPlayers;
+
+        // Actualizar powerups
+        gameState.powerups = serverState.powerups;
+
+        // Actualizar UI
+        updateUI();
+
+        // LÓGICA MEJORADA para mostrar/ocultar el botón Start Game
+        console.log("Verificando condiciones para mostrar botón Start Game:");
+        console.log("- Jugadores:", gameState.players.size);
+        console.log("- Mínimo requerido:", GAME_CONFIG.minPlayers);
+        console.log("- Fase del juego:", gameState.gamePhase);
+        console.log("- Juego corriendo:", gameState.gameRunning);
+
+        const shouldShowStartButton =
+          gameState.players.size >= GAME_CONFIG.minPlayers &&
+          (gameState.gamePhase === "waiting" ||
+            gameState.gamePhase === "" ||
+            !gameState.gamePhase) &&
+          !gameState.gameRunning;
+
+        console.log("¿Mostrar botón Start?", shouldShowStartButton);
+
+        if (shouldShowStartButton) {
+          document.getElementById("startGame").style.display = "inline-block";
+
+          // Añadir indicador de modo prueba si corresponde
+          if (GAME_CONFIG.testMode && gameState.players.size === 1) {
+            document.getElementById("startGame").textContent =
+              "Start Game (Test Mode)";
+          } else {
+            document.getElementById("startGame").textContent = "Start Game";
+          }
+        } else {
+          document.getElementById("startGame").style.display = "none";
         }
 
-        function getAlivePlayers() {
-            return Array.from(gameState.players.values()).filter(p => p.alive);
+        // Desactivar el botón Join Game si ya estamos en el juego
+        if (
+          gameState.myPlayerId &&
+          gameState.players.has(gameState.myPlayerId)
+        ) {
+          document.getElementById("joinGame").disabled = true;
+          document.getElementById("joinGame").textContent = "Joined ✓";
+        } else {
+          // Ensure join game button is enabled and text is reset if player is not in game
+          document.getElementById("joinGame").disabled = false;
+          document.getElementById("joinGame").textContent = "Join Game";
         }
-
-        // Update UI periodically
-        setInterval(updateUI, 100);
-
-        function spawnPowerup() {
-            if (gameState.powerups.length < 3) {
-                const types = Object.keys(POWERUP_TYPES);
-                const type = types[Math.floor(Math.random() * types.length)];
-                
-                // Spawn inside the ring but not too close to center
-                const angle = Math.random() * Math.PI * 2;
-                const minRadius = ringRadius * 0.2; // Minimum distance from center
-                const maxRadius = ringRadius * 0.7; // Not too close to edge
-                const distance = minRadius + Math.random() * (maxRadius - minRadius);
-                
-                gameState.powerups.push({
-                    type: type,
-                    x: centerX + Math.cos(angle) * distance,
-                    y: centerY + Math.sin(angle) * distance,
-                    rotation: 0
-                });
-            }
-        }
-
-        // Add a simple message display function
-        function showMessage(text, duration = 2000) {
-            const message = document.createElement('div');
-            message.style.position = 'absolute';
-            message.style.top = '20px';
-            message.style.left = '50%';
-            message.style.transform = 'translateX(-50%)';
-            message.style.background = 'rgba(0,0,0,0.7)';
-            message.style.color = 'white';
-            message.style.padding = '10px 20px';
-            message.style.borderRadius = '20px';
-            message.style.fontWeight = 'bold';
-            message.style.zIndex = '1000';
-            message.textContent = text;
-            
-            document.body.appendChild(message);
-            
-            setTimeout(() => {
-                message.style.opacity = '0';
-                message.style.transition = 'opacity 0.5s';
-                setTimeout(() => document.body.removeChild(message), 500);
-            }, duration);
-        }
-
-        // Añadir esta nueva función
-        function updateGameStateFromServer(serverState) {
-            console.log('Estado recibido del servidor:', serverState);
-            console.log('Número de jugadores:', serverState.players.length);
-            console.log('Fase del juego:', serverState.gamePhase);
-            console.log('Juego corriendo:', serverState.gameRunning);
-            
-            // Actualizar el estado del juego con los datos del servidor
-            gameState.gameRunning = serverState.gameRunning;
-            gameState.gamePhase = serverState.gamePhase;
-            gameState.prizePool = serverState.prizePool;
-            gameState.countdown = serverState.countdown;
-            gameState.gameTime = serverState.gameTime;
-            
-            // Actualizar tracking de personajes basado en los jugadores del servidor
-            assignedCharacters.clear();
-            
-            // Convertir el array de jugadores en un Map
-            const newPlayers = new Map();
-            serverState.players.forEach(player => {
-                // Asegurar que el jugador tenga un personaje asignado
-                if (!player.characterIndex) {
-                    player.characterIndex = getNextAvailableCharacter();
-                } else {
-                    assignedCharacters.add(player.characterIndex);
-                }
-                
-                newPlayers.set(player.id, player);
-                
-                // Si este jugador soy yo, guardar mi ID
-                if (player.address === walletAddress) {
-                    gameState.myPlayerId = player.id;
-                }
-            });
-            gameState.players = newPlayers;
-            
-            // Actualizar powerups
-            gameState.powerups = serverState.powerups;
-            
-            // Actualizar UI
-            updateUI();
-            
-            // LÓGICA MEJORADA para mostrar/ocultar el botón Start Game
-            console.log('Verificando condiciones para mostrar botón Start Game:');
-            console.log('- Jugadores:', gameState.players.size);
-            console.log('- Mínimo requerido:', GAME_CONFIG.minPlayers);
-            console.log('- Fase del juego:', gameState.gamePhase);
-            console.log('- Juego corriendo:', gameState.gameRunning);
-            
-            const shouldShowStartButton = 
-                gameState.players.size >= GAME_CONFIG.minPlayers && 
-                (gameState.gamePhase === 'waiting' || gameState.gamePhase === '' || !gameState.gamePhase) && 
-                !gameState.gameRunning;
-                
-            console.log('¿Mostrar botón Start?', shouldShowStartButton);
-            
-            if (shouldShowStartButton) {
-                document.getElementById('startGame').style.display = 'inline-block';
-                
-                // Añadir indicador de modo prueba si corresponde
-                if (GAME_CONFIG.testMode && gameState.players.size === 1) {
-                    document.getElementById('startGame').textContent = 'Start Game (Test Mode)';
-                } else {
-                    document.getElementById('startGame').textContent = 'Start Game';
-                }
-            } else {
-                document.getElementById('startGame').style.display = 'none';
-            }
-            
-            // Desactivar el botón Join Game si ya estamos en el juego
-            if (gameState.myPlayerId && gameState.players.has(gameState.myPlayerId)) {
-                document.getElementById('joinGame').disabled = true;
-                document.getElementById('joinGame').textContent = 'Joined ✓';
-            } else {
-                // Ensure join game button is enabled and text is reset if player is not in game
-                document.getElementById('joinGame').disabled = false;
-                document.getElementById('joinGame').textContent = 'Join Game';
-            }
-        }
+      }
     </script>
-</body>
+  </body>
 </html>
