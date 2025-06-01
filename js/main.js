@@ -215,5 +215,3 @@ function addDemoPlayers() {
     updateUI();
 }
 
-// ...remaining game functions would continue here...
-// The rest of the functions from the original file would be moved here with appropriate refactoring
