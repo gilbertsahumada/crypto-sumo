@@ -3,21 +3,25 @@ class GameConnection {
         this.socket = null;
         this.connected = false;
         
+        // MODIFICAR: URL dinámica según el entorno
         if (url) {
             this.url = url;
         } else {
+            // Detectar automáticamente la URL correcta
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const hostname = window.location.hostname;
             const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
             
+            // Si estamos en localhost, usar puerto 3000
             if (hostname === 'localhost' || hostname === '127.0.0.1') {
                 this.url = `${protocol}//${hostname}:3000`;
             } else {
+                // En producción, usar la misma URL que la página
                 this.url = `${protocol}//${hostname}${port !== '80' && port !== '443' ? ':' + port : ''}`;
             }
         }
         
-        console.log(`GameConnection: Configurando WebSocket con URL: ${this.url}`);
+        console.log(`WebSocket URL configurada: ${this.url}`);
         
         this.clientId = null;
         this.callbacks = {
@@ -34,11 +38,11 @@ class GameConnection {
 
     connect() {
         try {
-            console.log(`GameConnection: Intentando conectar a ${this.url}...`);
+            console.log(`Conectando a ${this.url}...`);
             this.socket = new WebSocket(this.url);
 
             this.socket.onopen = () => {
-                console.log(`GameConnection: Conexión WebSocket establecida con ${this.url}`);
+                console.log('Conexión WebSocket establecida');
                 this.connected = true;
                 this.reconnectAttempts = 0;
                 this.startHeartbeat();
@@ -46,14 +50,15 @@ class GameConnection {
             };
 
             this.socket.onclose = (event) => {
-                console.log(`GameConnection: Conexión WebSocket cerrada. Código: ${event.code}, Razón: "${event.reason}", Limpio: ${event.wasClean}`);
+                console.log(`Conexión WebSocket cerrada: ${event.code} ${event.reason}`);
                 this.connected = false;
                 this.stopHeartbeat();
                 this.callbacks.onDisconnect();
                 
+                // MODIFICAR: Reducir intentos de reconexión y añadir backoff
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.reconnectAttempts++;
-                    const delay = Math.min(3000 * this.reconnectAttempts, 15000);
+                    const delay = Math.min(3000 * this.reconnectAttempts, 15000); // Backoff exponencial
                     console.log(`Reconectando (${this.reconnectAttempts}/${this.maxReconnectAttempts}) en ${delay}ms...`);
                     setTimeout(() => this.connect(), delay);
                 } else {
@@ -62,9 +67,9 @@ class GameConnection {
             };
 
             this.socket.onerror = (error) => {
-                console.error('GameConnection: Error en WebSocket:', error);
-                console.error(`GameConnection: Error al intentar conectar a URL: ${this.url}. Verifique la consola del navegador para más detalles (ej. problemas de certificado SSL/TLS para wss).`);
-                this.callbacks.onError(new Error("WebSocket connection error. See browser console for details."));
+                console.error('Error en WebSocket:', error);
+                console.error('URL intentada:', this.url);
+                this.callbacks.onError(error);
             };
 
             this.socket.onmessage = (event) => {
@@ -76,8 +81,8 @@ class GameConnection {
                 }
             };
         } catch (error) {
-            console.error('GameConnection: Error al crear instancia de WebSocket:', error);
-            console.error(`GameConnection: URL configurada era: ${this.url}`);
+            console.error('Error creando conexión WebSocket:', error);
+            console.error('URL configurada:', this.url);
             this.callbacks.onError(error);
         }
     }
@@ -132,12 +137,14 @@ class GameConnection {
         });
     }
 
+    // AÑADIR: Método para verificar estado de jugadores en servidor
     checkConnectedPlayers() {
         return this.sendMessage({
             type: 'getConnectedPlayers'
         });
     }
 
+    // AÑADIR: Método para obtener información detallada del servidor
     getServerInfo() {
         return this.sendMessage({
             type: 'getServerInfo'

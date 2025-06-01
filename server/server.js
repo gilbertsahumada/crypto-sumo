@@ -48,11 +48,6 @@ const wss = new WebSocket.Server({
   clientTracking: true
 });
 
-// AÑADIR: Manejador de errores global para el servidor WebSocket
-wss.on('error', (error) => {
-  console.error('Error global del servidor WebSocket:', error);
-});
-
 // Configuración del servidor
 const SERVER_CONFIG = {
   minPlayers: 1,
@@ -110,8 +105,7 @@ let blockchainConnected = false;
 // SIMPLIFICAR: Conexión blockchain básica
 async function initBlockchainConnection() {
   try {
-    // CORREGIR: Usar ethers.JsonRpcProvider para Ethers v6+
-    provider = new ethers.JsonRpcProvider(FLOW_TESTNET.rpcUrls[0]);
+    provider = new ethers.providers.JsonRpcProvider(FLOW_TESTNET.rpcUrls[0]);
     contract = new ethers.Contract(SUMO_CONTRACT_ADDRESS, SUMO_CONTRACT_ABI, provider);
     
     const blockNumber = await provider.getBlockNumber();
@@ -207,110 +201,88 @@ wss.on('connection', (ws, req) => {
 function handleClientMessage(ws, clientId, data) {
   console.log(`Mensaje de ${clientId}:`, data.type);
   
-  try { // AÑADIR: Bloque try-catch para robustez
-    switch (data.type) {
-      case 'registerPlayer':
-        // Solo registrar el jugador, no simular el juego
-        if (data.address && data.bet) {
-          serverState.connectedClients.set(clientId, {
-            address: data.address,
-            bet: data.bet,
-            lastSeen: Date.now()
-          });
-          
-          console.log(`Jugador registrado: ${data.address} con ${data.bet} FLOW`);
-          broadcastStateUpdate();
-        }
-        break;
+  switch (data.type) {
+    case 'registerPlayer':
+      // Solo registrar el jugador, no simular el juego
+      if (data.address && data.bet) {
+        serverState.connectedClients.set(clientId, {
+          address: data.address,
+          bet: data.bet,
+          lastSeen: Date.now()
+        });
         
-      case 'checkBlockchainState':
-        if (blockchainConnected && data.address) {
-          verifyPlayerInBlockchain(data.address).then(isInGame => {
-            ws.send(JSON.stringify({
-              type: 'blockchainStateResult',
-              isInGame: isInGame,
-              address: data.address,
-              gamePhase: serverState.gamePhase
-            }));
-          }).catch(error => {
-            console.error(`Error en verifyPlayerInBlockchain para ${data.address}:`, error); // AÑADIR: Log de error específico
-            ws.send(JSON.stringify({
-              type: 'error',
-              message: 'Error verificando estado en blockchain'
-            }));
-          });
-        } else {
+        console.log(`Jugador registrado: ${data.address} con ${data.bet} FLOW`);
+        broadcastStateUpdate();
+      }
+      break;
+      
+    case 'checkBlockchainState':
+      if (blockchainConnected && data.address) {
+        verifyPlayerInBlockchain(data.address).then(isInGame => {
           ws.send(JSON.stringify({
             type: 'blockchainStateResult',
-            isInGame: false,
+            isInGame: isInGame,
             address: data.address,
-            error: 'Sin conexión blockchain'
+            gamePhase: serverState.gamePhase
           }));
-        }
-        break;
-        
-      case 'requestGameState':
-        // Enviar estado actual del servidor
+        }).catch(error => {
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Error verificando estado en blockchain'
+          }));
+        });
+      } else {
         ws.send(JSON.stringify({
-          type: 'serverState',
-          data: {
-            gamePhase: serverState.gamePhase,
-            connectedClients: Array.from(serverState.connectedClients.values()),
-            blockchainConnected: blockchainConnected,
-            lastSync: serverState.lastBlockchainSync
-          }
+          type: 'blockchainStateResult',
+          isInGame: false,
+          address: data.address,
+          error: 'Sin conexión blockchain'
         }));
-        break;
-        
-      case 'heartbeat':
-        // Actualizar última vez visto
-        if (serverState.connectedClients.has(clientId)) {
-          serverState.connectedClients.get(clientId).lastSeen = Date.now();
-        }
-        break;
-        
-      case 'getConnectedPlayers':
-        // Enviar lista de jugadores realmente conectados
-        ws.send(JSON.stringify({
-          type: 'connectedPlayersResult',
-          players: Array.from(serverState.connectedClients.values()),
-          count: serverState.connectedClients.size
-        }));
-        break;
-        
-      case 'getServerInfo':
-        // Enviar información detallada del servidor
-        ws.send(JSON.stringify({
-          type: 'serverInfoResult',
-          data: {
-            connectedClients: serverState.connectedClients.size,
-            gamePhase: serverState.gamePhase,
-            blockchainConnected: blockchainConnected,
-            lastSync: serverState.lastBlockchainSync,
-            players: Array.from(serverState.connectedClients.values())
-          }
-        }));
-        break;
-        
-      // AÑADIR: default case para mensajes no reconocidos
-      default:
-        console.warn(`Tipo de mensaje no reconocido: ${data.type} de ${clientId}`);
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: `Tipo de mensaje no reconocido: ${data.type}`
-        }));
-        break;
-    }
-  } catch (error) { // AÑADIR: Capturar errores dentro del switch
-    console.error(`Error procesando mensaje tipo ${data.type} para cliente ${clientId}:`, error);
-    try {
+      }
+      break;
+      
+    case 'requestGameState':
+      // Enviar estado actual del servidor
       ws.send(JSON.stringify({
-        type: 'error',
-        message: `Error interno del servidor al procesar su solicitud.`
+        type: 'serverState',
+        data: {
+          gamePhase: serverState.gamePhase,
+          connectedClients: Array.from(serverState.connectedClients.values()),
+          blockchainConnected: blockchainConnected,
+          lastSync: serverState.lastBlockchainSync
+        }
       }));
-    } catch (sendError) {
-      console.error(`Error al enviar mensaje de error al cliente ${clientId}:`, sendError);
-    }
+      break;
+      
+    case 'heartbeat':
+      // Actualizar última vez visto
+      if (serverState.connectedClients.has(clientId)) {
+        serverState.connectedClients.get(clientId).lastSeen = Date.now();
+      }
+      break;
+      
+    case 'getConnectedPlayers':
+      // Enviar lista de jugadores realmente conectados
+      ws.send(JSON.stringify({
+        type: 'connectedPlayersResult',
+        players: Array.from(serverState.connectedClients.values()),
+        count: serverState.connectedClients.size
+      }));
+      break;
+      
+    case 'getServerInfo':
+      // Enviar información detallada del servidor
+      ws.send(JSON.stringify({
+        type: 'serverInfoResult',
+        data: {
+          connectedClients: serverState.connectedClients.size,
+          gamePhase: serverState.gamePhase,
+          blockchainConnected: blockchainConnected,
+          lastSync: serverState.lastBlockchainSync,
+          players: Array.from(serverState.connectedClients.values())
+        }
+      }));
+      break;
   }
 }
 
