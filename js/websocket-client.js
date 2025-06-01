@@ -1,156 +1,179 @@
 class GameConnection {
-    constructor() {
+    constructor(url) {
         this.socket = null;
         this.connected = false;
+        this.url = url || 'ws://localhost:3000';
         this.clientId = null;
-        this.serverUrl = this.getWebSocketUrl();
+        this.callbacks = {
+            onConnect: () => {},
+            onDisconnect: () => {},
+            onServerStateUpdate: () => {},
+            onBlockchainStateResult: () => {},
+            onError: () => {}
+        };
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.callbacks = {
-            onConnect: null,
-            onDisconnect: null,
-            onGameState: null,
-            onError: null
-        };
-    }
-
-    getWebSocketUrl() {
-        // Determinar URL de WebSocket basada en la URL actual
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
-        
-        // Para desarrollo local, usa localhost:3000
-        if (host === 'localhost' || host === '127.0.0.1') {
-            return `${protocol}//${host}:3000`;
-        }
-        
-        // Para producción, usa la misma base de URL
-        return `${protocol}//${host}:${port}`;
+        this.heartbeatInterval = null;
     }
 
     connect() {
         try {
-            console.log(`Conectando a WebSocket: ${this.serverUrl}`);
-            this.socket = new WebSocket(this.serverUrl);
+            console.log(`Conectando a ${this.url}...`);
+            this.socket = new WebSocket(this.url);
 
             this.socket.onopen = () => {
                 console.log('Conexión WebSocket establecida');
                 this.connected = true;
                 this.reconnectAttempts = 0;
-                if (this.callbacks.onConnect) this.callbacks.onConnect();
+                this.startHeartbeat();
+                this.callbacks.onConnect();
             };
 
-            this.socket.onmessage = (event) => {
-                this.handleMessage(event.data);
-            };
-
-            this.socket.onclose = () => {
-                console.log('Conexión WebSocket cerrada');
+            this.socket.onclose = (event) => {
+                console.log(`Conexión WebSocket cerrada: ${event.code} ${event.reason}`);
                 this.connected = false;
-                if (this.callbacks.onDisconnect) this.callbacks.onDisconnect();
-                this.attemptReconnect();
+                this.stopHeartbeat();
+                this.callbacks.onDisconnect();
+                
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    console.log(`Reconectando (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+                    setTimeout(() => this.connect(), 3000);
+                }
             };
 
             this.socket.onerror = (error) => {
-                console.error('Error de WebSocket:', error);
-                if (this.callbacks.onError) this.callbacks.onError(error);
+                console.error('Error en WebSocket:', error);
+                this.callbacks.onError(error);
+            };
+
+            this.socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleMessage(data);
+                } catch (error) {
+                    console.error('Error procesando mensaje:', error);
+                }
             };
         } catch (error) {
-            console.error('Error al crear conexión WebSocket:', error);
-            if (this.callbacks.onError) this.callbacks.onError(error);
+            console.error('Error creando conexión WebSocket:', error);
+            this.callbacks.onError(error);
         }
-    }
-
-    attemptReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.log('Máximo de intentos de reconexión alcanzado');
-            return;
-        }
-
-        this.reconnectAttempts++;
-        console.log(`Intentando reconectar (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-        
-        setTimeout(() => {
-            this.connect();
-        }, 2000 * this.reconnectAttempts); // Backoff exponencial
     }
 
     handleMessage(data) {
-        try {
-            const message = JSON.parse(data);
-            
-            switch (message.type) {
-                case 'connection':
-                    this.clientId = message.id;
-                    console.log(`ID de cliente asignado: ${this.clientId}`);
-                    break;
-                    
-                case 'gameState':
-                    if (this.callbacks.onGameState) {
-                        this.callbacks.onGameState(message.data);
-                    }
-                    break;
-                    
-                case 'error':
-                    console.error('Error del servidor:', message.message);
-                    alert(`Error: ${message.message}`);
-                    break;
-                    
-                default:
-                    console.log('Mensaje desconocido:', message);
-            }
-        } catch (error) {
-            console.error('Error al procesar mensaje:', error);
+        switch (data.type) {
+            case 'connection':
+                console.log(`ID de conexión: ${data.id}`);
+                this.clientId = data.id;
+                if (data.serverState) {
+                    this.callbacks.onServerStateUpdate(data.serverState);
+                }
+                break;
+                
+            case 'serverStateUpdate':
+                this.callbacks.onServerStateUpdate(data.data);
+                break;
+                
+            case 'blockchainStateResult':
+                console.log('Resultado verificación blockchain:', data);
+                this.callbacks.onBlockchainStateResult(data);
+                break;
+                
+            case 'error':
+                console.error('Error del servidor:', data.message);
+                this.callbacks.onError(new Error(data.message));
+                break;
+                
+            default:
+                console.log('Mensaje no manejado:', data);
         }
     }
 
-    send(type, data = {}) {
-        if (!this.connected || !this.socket) {
-            console.error('No se puede enviar mensaje, no hay conexión');
-            return false;
-        }
-
-        try {
-            const message = JSON.stringify({
-                type,
-                ...data
-            });
-            this.socket.send(message);
-            return true;
-        } catch (error) {
-            console.error('Error al enviar mensaje:', error);
-            return false;
-        }
-    }
-
-    joinGame(betAmount, walletAddress) {
-        return this.send('joinGame', {
-            bet: betAmount,
-            address: walletAddress,
-            color: `hsl(${Math.random() * 360}, 70%, 60%)`
+    registerPlayer(address, bet) {
+        return this.sendMessage({
+            type: 'registerPlayer',
+            address: address,
+            bet: bet
         });
     }
 
-    startGame() {
-        return this.send('startGame');
+    checkBlockchainState(address) {
+        return this.sendMessage({
+            type: 'checkBlockchainState',
+            address: address
+        });
     }
 
-    sendPlayerInput(keys) {
-        return this.send('playerInput', { keys });
+    requestGameState() {
+        return this.sendMessage({
+            type: 'requestGameState'
+        });
     }
 
-    setCallback(event, callback) {
-        if (this.callbacks.hasOwnProperty(event)) {
-            this.callbacks[event] = callback;
+    // AÑADIR: Método para verificar estado de jugadores en servidor
+    checkConnectedPlayers() {
+        return this.sendMessage({
+            type: 'getConnectedPlayers'
+        });
+    }
+
+    // AÑADIR: Método para obtener información detallada del servidor
+    getServerInfo() {
+        return this.sendMessage({
+            type: 'getServerInfo'
+        });
+    }
+
+    startHeartbeat() {
+        this.heartbeatInterval = setInterval(() => {
+            this.sendMessage({
+                type: 'heartbeat',
+                timestamp: Date.now()
+            });
+        }, 30000);
+    }
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+    }
+
+    setCallback(type, callback) {
+        if (this.callbacks.hasOwnProperty(type)) {
+            this.callbacks[type] = callback;
+        } else {
+            console.warn(`Tipo de callback no soportado: ${type}`);
+        }
+    }
+
+    sendMessage(message) {
+        if (!this.connected || !this.socket) {
+            console.warn('No se puede enviar mensaje: no conectado');
+            return false;
+        }
+        
+        try {
+            this.socket.send(JSON.stringify(message));
+            return true;
+        } catch (error) {
+            console.error('Error enviando mensaje:', error);
+            return false;
         }
     }
 
     disconnect() {
+        this.stopHeartbeat();
         if (this.socket) {
             this.socket.close();
             this.socket = null;
-            this.connected = false;
         }
+        this.connected = false;
     }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = GameConnection;
 }
