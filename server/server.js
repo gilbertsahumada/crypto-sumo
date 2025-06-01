@@ -6,16 +6,47 @@ const ethers = require('ethers');
 
 // Configuración del servidor Express
 const app = express();
+
+// AÑADIR: Configuración de CORS para desarrollo y producción
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.static(path.join(__dirname, '../')));
+
+// AÑADIR: Endpoint de salud para verificar que el servidor está funcionando
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    websocket: wss.clients.size,
+    blockchain: blockchainConnected
+  });
+});
 
 // Iniciar servidor HTTP
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en el puerto ${PORT}`);
+  console.log(`WebSocket disponible en ws://localhost:${PORT}`);
 });
 
-// Crear servidor WebSocket
-const wss = new WebSocket.Server({ server });
+// MODIFICAR: Crear servidor WebSocket con configuración mejorada
+const wss = new WebSocket.Server({ 
+  server,
+  // AÑADIR: Configuración adicional para producción
+  perMessageDeflate: false,
+  maxPayload: 1024 * 1024, // 1MB max
+  clientTracking: true
+});
 
 // Configuración del servidor
 const SERVER_CONFIG = {
@@ -129,9 +160,10 @@ async function verifyPlayerInBlockchain(address) {
 }
 
 // SIMPLIFICAR: Manejar conexiones WebSocket
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   const clientId = uuidv4();
-  console.log(`Cliente conectado: ${clientId}`);
+  const clientIP = req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+  console.log(`Cliente conectado: ${clientId} desde ${clientIP}`);
   
   // Enviar ID y estado actual
   ws.send(JSON.stringify({
@@ -154,10 +186,14 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('close', () => {
-    console.log(`Cliente desconectado: ${clientId}`);
+  ws.on('close', (code, reason) => {
+    console.log(`Cliente desconectado: ${clientId} - Código: ${code}, Razón: ${reason || 'No especificada'}`);
     serverState.connectedClients.delete(clientId);
     broadcastStateUpdate();
+  });
+
+  ws.on('error', (error) => {
+    console.error(`Error en WebSocket para cliente ${clientId}:`, error);
   });
 });
 
@@ -282,6 +318,11 @@ setInterval(() => {
       serverState.connectedClients.delete(clientId);
     }
   }
+}, 60000);
+
+// AÑADIR: Logging de estado del servidor cada minuto
+setInterval(() => {
+  console.log(`Estado del servidor - Clientes: ${wss.clients.size}, Blockchain: ${blockchainConnected ? 'conectado' : 'desconectado'}`);
 }, 60000);
 
 // Inicializar

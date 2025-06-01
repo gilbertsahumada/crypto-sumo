@@ -2,7 +2,27 @@ class GameConnection {
     constructor(url) {
         this.socket = null;
         this.connected = false;
-        this.url = url || 'ws://localhost:3000';
+        
+        // MODIFICAR: URL dinámica según el entorno
+        if (url) {
+            this.url = url;
+        } else {
+            // Detectar automáticamente la URL correcta
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const hostname = window.location.hostname;
+            const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
+            
+            // Si estamos en localhost, usar puerto 3000
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                this.url = `${protocol}//${hostname}:3000`;
+            } else {
+                // En producción, usar la misma URL que la página
+                this.url = `${protocol}//${hostname}${port !== '80' && port !== '443' ? ':' + port : ''}`;
+            }
+        }
+        
+        console.log(`WebSocket URL configurada: ${this.url}`);
+        
         this.clientId = null;
         this.callbacks = {
             onConnect: () => {},
@@ -35,15 +55,20 @@ class GameConnection {
                 this.stopHeartbeat();
                 this.callbacks.onDisconnect();
                 
+                // MODIFICAR: Reducir intentos de reconexión y añadir backoff
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.reconnectAttempts++;
-                    console.log(`Reconectando (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-                    setTimeout(() => this.connect(), 3000);
+                    const delay = Math.min(3000 * this.reconnectAttempts, 15000); // Backoff exponencial
+                    console.log(`Reconectando (${this.reconnectAttempts}/${this.maxReconnectAttempts}) en ${delay}ms...`);
+                    setTimeout(() => this.connect(), delay);
+                } else {
+                    console.log('Máximo de intentos de reconexión alcanzado. Modo offline.');
                 }
             };
 
             this.socket.onerror = (error) => {
                 console.error('Error en WebSocket:', error);
+                console.error('URL intentada:', this.url);
                 this.callbacks.onError(error);
             };
 
@@ -57,6 +82,7 @@ class GameConnection {
             };
         } catch (error) {
             console.error('Error creando conexión WebSocket:', error);
+            console.error('URL configurada:', this.url);
             this.callbacks.onError(error);
         }
     }

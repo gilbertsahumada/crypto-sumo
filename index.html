@@ -162,21 +162,25 @@
         setupEthers();
         setupEventListeners();
 
-        // MODIFICAR: Configuración simplificada de WebSocket
-        gameConnection = new GameConnection();
+        // MODIFICAR: Configuración mejorada de WebSocket con detección de entorno
+        const wsUrl = getWebSocketURL();
+        console.log("Usando WebSocket URL:", wsUrl);
+        gameConnection = new GameConnection(wsUrl);
 
-        // SIMPLIFICAR: Callbacks básicos
+        // SIMPLIFICAR: Callbacks básicos con mejor manejo de errores
         gameConnection.setCallback("onConnect", () => {
           showMessage("Conectado al servidor");
+          console.log("WebSocket conectado exitosamente");
           // Registrar jugador si ya tenemos wallet conectada
           if (walletConnected && walletAddress) {
             registerWithServer();
           }
           // AÑADIR: Limpiar jugadores demo cuando se conecta al servidor
-          clearDemoPlayers();
+          //clearDemoPlayers();
         });
 
         gameConnection.setCallback("onDisconnect", () => {
+          console.log("WebSocket desconectado");
           showMessage("Desconectado del servidor - Modo offline");
           // AÑADIR: Solo mostrar demos si no hay jugadores reales
           setTimeout(() => {
@@ -198,12 +202,33 @@
         });
 
         gameConnection.setCallback("onError", (error) => {
-          console.error("Error de conexión:", error);
-          showMessage("Error de conexión - Continuando offline");
+          console.error("Error de conexión WebSocket:", error);
+          console.log("Continuando en modo offline...");
+          showMessage("Sin conexión al servidor - Modo offline", 4000);
+          
+          // Asegurar que tenemos jugadores demo si no hay otros jugadores
+          setTimeout(() => {
+            if (gameState.players.size === 0 && !walletConnected) {
+              addDemoPlayersOfflineMode();
+            }
+          }, 3000);
         });
 
-        // Conectar al servidor
-        gameConnection.connect();
+        // MODIFICAR: Intentar conectar con timeout
+        try {
+          gameConnection.connect();
+          
+          // Timeout para la conexión inicial
+          setTimeout(() => {
+            if (!gameConnection.connected) {
+              console.log("Timeout de conexión WebSocket - continuando offline");
+              // No mostrar error adicional, ya se maneja en onError
+            }
+          }, 5000);
+        } catch (connectionError) {
+          console.error("Error iniciando conexión WebSocket:", connectionError);
+          showMessage("Error de conexión - Modo offline", 3000);
+        }
 
         // Iniciar bucle de renderizado local (siempre local ahora)
         gameLoop();
@@ -412,7 +437,7 @@
           }
 
           // AÑADIR: Limpiar jugadores demo cuando se conecta wallet
-          clearDemoPlayers();
+          //clearDemoPlayers();
         } catch (error) {
           console.error("Error connecting wallet:", error);
           alert(`Error connecting wallet: ${error.message || error}`);
@@ -1763,6 +1788,16 @@
         message.style.fontWeight = "bold";
         message.style.zIndex = "1500";
         message.style.border = "2px solid #FFD700";
+        
+        // AÑADIR: Colores diferentes según el tipo de mensaje
+        if (text.includes("Error") || text.includes("offline")) {
+          message.style.border = "2px solid #ff6b6b";
+          message.style.background = "rgba(255, 107, 107, 0.9)";
+        } else if (text.includes("Conectado")) {
+          message.style.border = "2px solid #4ecdc4";
+          message.style.background = "rgba(78, 205, 196, 0.9)";
+        }
+        
         message.textContent = text;
 
         document.body.appendChild(message);
@@ -3014,33 +3049,114 @@
         }, 1000);
       }
 
-      // AÑADIR: Función para limpiar jugadores demo
-      function clearDemoPlayers() {
-        console.log("Limpiando jugadores demo...");
-        const realPlayers = new Map();
+      // AÑADIR: Función para determinar la URL correcta del WebSocket
+      function getWebSocketURL() {
+        // Si estamos en desarrollo local
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return 'ws://localhost:3000';
+        }
         
-        gameState.players.forEach((player, id) => {
-          // Mantener solo jugadores reales (no AI)
-          if (!player.isAI) {
-            realPlayers.set(id, player);
-          } else {
-            // Liberar personaje asignado
-            if (player.characterIndex) {
-              releaseCharacter(player.characterIndex);
+        // Si estamos en producción
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const hostname = window.location.hostname;
+        const port = window.location.port;
+        
+        // Construir URL base
+        let baseUrl = `${protocol}//${hostname}`;
+        
+        // Añadir puerto si no es el estándar
+        if (port && port !== '80' && port !== '443') {
+          baseUrl += `:${port}`;
+        }
+        
+        return baseUrl;
+      }
+
+      // MODIFICAR: Mejorar función para mostrar mensajes de error de conexión
+      function showMessage(text, duration = 2000) {
+        // Remover mensaje anterior si existe
+        const existingMessage = document.getElementById("gameMessage");
+        if (existingMessage) {
+          document.body.removeChild(existingMessage);
+        }
+
+        const message = document.createElement("div");
+        message.id = "gameMessage";
+        message.style.position = "fixed";
+        message.style.top = "20px";
+        message.style.left = "50%";
+        message.style.transform = "translateX(-50%)";
+        message.style.background = "rgba(0,0,0,0.9)";
+        message.style.color = "white";
+        message.style.padding = "15px 25px";
+        message.style.borderRadius = "25px";
+        message.style.fontWeight = "bold";
+        message.style.zIndex = "1500";
+        message.style.border = "2px solid #FFD700";
+        
+        // AÑADIR: Colores diferentes según el tipo de mensaje
+        if (text.includes("Error") || text.includes("offline")) {
+          message.style.border = "2px solid #ff6b6b";
+          message.style.background = "rgba(255, 107, 107, 0.9)";
+        } else if (text.includes("Conectado")) {
+          message.style.border = "2px solid #4ecdc4";
+          message.style.background = "rgba(78, 205, 196, 0.9)";
+        }
+        
+        message.textContent = text;
+
+        document.body.appendChild(message);
+
+        if (duration > 0) {
+          setTimeout(() => {
+            if (document.getElementById("gameMessage") === message) {
+              message.style.opacity = "0";
+              message.style.transition = "opacity 0.5s";
+              setTimeout(() => {
+                if (document.body.contains(message)) {
+                  document.body.removeChild(message);
+                }
+              }, 500);
             }
-            console.log(`Removiendo jugador demo: ${id}`);
-          }
-        });
-        
-        gameState.players = realPlayers;
-        
-        // Recalcular prize pool sin demos
-        gameState.prizePool = 0;
-        gameState.players.forEach(player => {
-          gameState.prizePool += player.bet;
-        });
-        
+          }, duration);
+        }
+      }
+
+      // MODIFICAR: Limpiar personajes asignados al resetear el juego
+      function resetGame() {
+        // Liberar todos los personajes asignados
+        assignedCharacters.clear();
+        nextCharacterIndex = 1;
+
+        // Reset game state for a new round
+        gameState = {
+          players: new Map(),
+          powerups: [],
+          gameRunning: false,
+          gamePhase: "waiting",
+          prizePool: 0,
+          myPlayerId: null,
+          countdown: 0,
+          gameTime: 60,
+        };
+
+        // Re-enable UI controls
+        document.getElementById("joinGame").disabled = false;
+        document.getElementById("startGame").style.display = "none";
+        document.getElementById("connectWallet").disabled = walletConnected;
+
+        // Clear player input state
+        Object.keys(keys).forEach((key) => (keys[key] = false));
+
         updateUI();
+
+        // MODIFICAR: Solo añadir demos si estamos completamente offline
+        setTimeout(() => {
+          if (gameState.players.size === 0 && !gameConnection.connected && !walletConnected) {
+            console.log("Reseteo completo - añadiendo demos para modo offline");
+            addDemoPlayersOfflineMode();
+          }
+        }, 1000);
       }
 
       // MODIFICAR: Función para agregar jugadores demo solo en modo offline completo
