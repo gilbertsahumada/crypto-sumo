@@ -154,6 +154,7 @@
 
       // Variables para el servicio de estado del juego
       let gameStateService;
+      let gameConnection;
 
       // Initialize
       document.addEventListener("DOMContentLoaded", function () {
@@ -161,60 +162,72 @@
         setupEthers();
         setupEventListeners();
 
-        // Iniciar conexión WebSocket
+        // MODIFICAR: Configuración simplificada de WebSocket
         gameConnection = new GameConnection();
 
-        // Configurar callbacks de WebSocket
+        // SIMPLIFICAR: Callbacks básicos
         gameConnection.setCallback("onConnect", () => {
-          showMessage("Conectado al servidor del juego");
+          showMessage("Conectado al servidor");
+          // Registrar jugador si ya tenemos wallet conectada
+          if (walletConnected && walletAddress) {
+            registerWithServer();
+          }
+          // AÑADIR: Limpiar jugadores demo cuando se conecta al servidor
+          clearDemoPlayers();
         });
 
         gameConnection.setCallback("onDisconnect", () => {
-          showMessage("Desconectado del servidor del juego");
+          showMessage("Desconectado del servidor - Modo offline");
+          // AÑADIR: Solo mostrar demos si no hay jugadores reales
+          setTimeout(() => {
+            if (gameState.players.size === 0 && !walletConnected) {
+              addDemoPlayersOfflineMode();
+            }
+          }, 2000);
         });
 
-        gameConnection.setCallback("onGameState", (newState) => {
-          updateGameStateFromServer(newState);
+        // NUEVO: Manejar actualizaciones del servidor
+        gameConnection.setCallback("onServerStateUpdate", (serverState) => {
+          console.log("Actualización del servidor:", serverState);
+          updateServerStatus(serverState);
+        });
+
+        gameConnection.setCallback("onBlockchainStateResult", (data) => {
+          console.log("Resultado verificación blockchain:", data);
+          handleBlockchainVerification(data);
         });
 
         gameConnection.setCallback("onError", (error) => {
           console.error("Error de conexión:", error);
-          showMessage("Error de conexión con el servidor");
+          showMessage("Error de conexión - Continuando offline");
         });
 
         // Conectar al servidor
         gameConnection.connect();
 
-        // Iniciar bucle de renderizado local
+        // Iniciar bucle de renderizado local (siempre local ahora)
         gameLoop();
 
-        // En modo offline, añadir jugadores demo
+        // MODIFICAR: Solo añadir jugadores demo si no hay conexión y no hay wallet
         setTimeout(() => {
-          if (gameState.players.size === 0 && !gameConnection.connected) {
-            addDemoPlayers();
+          if (gameState.players.size === 0 && !gameConnection.connected && !walletConnected) {
+            console.log("Añadiendo jugadores demo - modo completamente offline");
+            addDemoPlayersOfflineMode();
           }
-        }, 2000);
+        }, 3000); // Aumentar tiempo para dar chance a conectar
 
-        // Inicializar servicio de estado del juego (sin provider aún)
+        // SIMPLIFICAR: GameStateService solo escucha eventos blockchain
         gameStateService = new GameStateService(
           "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489",
           SUMO_CONTRACT_ABI
         );
 
-        // Configurar callbacks para eventos del juego
         gameStateService.onGameStarted(() => {
           console.log("Evento detectado: Juego iniciado en blockchain");
           if (!gameState.gameRunning) {
-            showMessage("El juego ha comenzado en la blockchain", 3000);
-
-            // Si el juego no está corriendo localmente, iniciarlo
-            if (gameConnection.connected) {
-              // Solicitar al servidor iniciar el juego (sabrá que ya comenzó en blockchain)
-              gameConnection.startGame();
-            } else {
-              // En modo offline, iniciar directamente
-              startGame();
-            }
+            showMessage("¡El juego ha comenzado en la blockchain!", 3000);
+            // El juego se inicia automáticamente cuando se detecta
+            startGameFromBlockchain();
           }
         });
 
@@ -222,12 +235,7 @@
           console.log("Evento detectado: Juego terminado en blockchain");
           if (gameState.gameRunning) {
             showMessage("El juego ha terminado en la blockchain", 3000);
-
-            // Si estamos conectados al servidor, el servidor debería detectar esto también
-            // Si estamos en modo offline, finalizar el juego
-            if (!gameConnection.connected) {
-              endGame();
-            }
+            endGame();
           }
         });
       });
@@ -389,6 +397,22 @@
               );
             }
           }
+
+          // AÑADIR: Registrar con el servidor si está conectado
+          if (gameConnection.connected) {
+            registerWithServer();
+          }
+
+          // AÑADIR: Verificar estado en blockchain a través del servidor
+          if (gameConnection.connected) {
+            gameConnection.checkBlockchainState(walletAddress);
+          } else {
+            // Verificación directa si no hay servidor
+            await checkIfPlayerAlreadyInGame();
+          }
+
+          // AÑADIR: Limpiar jugadores demo cuando se conecta wallet
+          clearDemoPlayers();
         } catch (error) {
           console.error("Error connecting wallet:", error);
           alert(`Error connecting wallet: ${error.message || error}`);
@@ -988,6 +1012,11 @@
                   console.warn("Error getting updated balance:", balanceError);
                 }
               }, 2000);
+
+              // MODIFICAR: Después de transacción exitosa, registrar con servidor
+              if (gameConnection.connected) {
+                registerWithServer();
+              }
             } else {
               throw new Error("Transaction failed");
             }
@@ -1781,10 +1810,11 @@
 
         updateUI();
 
-        // Add demo players again for testing
+        // MODIFICAR: Solo añadir demos si estamos completamente offline
         setTimeout(() => {
-          if (gameState.players.size === 0) {
-            addDemoPlayers();
+          if (gameState.players.size === 0 && !gameConnection.connected && !walletConnected) {
+            console.log("Reseteo completo - añadiendo demos para modo offline");
+            addDemoPlayersOfflineMode();
           }
         }, 1000);
       }
@@ -1983,7 +2013,7 @@
                 `Player ${player.address.substring(
                   0,
                   8
-                )} eliminated! ${remainingAlive} players remaining.`
+                )} eliminado! ${remainingAlive} jugadores restantes.`
               );
 
               // AÑADIR: Verificar inmediatamente si el juego debe terminar
@@ -2900,6 +2930,311 @@
           document.getElementById("joinGame").disabled = false;
           document.getElementById("joinGame").textContent = "Join Game";
         }
+      }
+
+      // NUEVO: Registrar jugador con el servidor
+      function registerWithServer() {
+        if (gameConnection.connected && walletConnected) {
+          const betAmount = parseFloat(document.getElementById("betAmount").value) || 0.01;
+          gameConnection.registerPlayer(walletAddress, betAmount);
+        }
+      }
+
+      // NUEVO: Actualizar estado del servidor en UI
+      function updateServerStatus(serverState) {
+        // Actualizar indicador de conexión blockchain
+        const networkStatus = document.getElementById("networkStatus");
+        if (serverState.blockchainConnected) {
+          networkStatus.textContent = `Connected to Flow Testnet (${serverState.connectedClients} clients)`;
+        } else {
+          networkStatus.textContent = "Server online, blockchain disconnected";
+        }
+
+        // Mostrar información del servidor en consola
+        console.log(`Servidor: ${serverState.gamePhase}, Clientes: ${serverState.connectedClients}`);
+      }
+
+      // NUEVO: Manejar resultado de verificación blockchain
+      function handleBlockchainVerification(data) {
+        if (data.isInGame) {
+          console.log("Jugador verificado en blockchain");
+          showMessage("Jugador verificado en blockchain ✓", 2000);
+          
+          // Si hay un juego activo, unirse automáticamente
+          if (data.gamePhase === 'playing') {
+            showMessage("Uniéndose al juego en progreso...", 2000);
+            // Lógica para unirse a juego existente
+          }
+        } else if (data.error) {
+          console.warn("Error verificando blockchain:", data.error);
+        } else {
+          console.log("Jugador no encontrado en blockchain");
+        }
+      }
+
+      // SIMPLIFICAR: Función para iniciar juego desde blockchain
+      function startGameFromBlockchain() {
+        // Solo iniciar si no estamos ya jugando
+        if (gameState.gameRunning) return;
+        
+        // Iniciar juego inmediatamente sin countdown
+        gameState.gamePhase = 'playing';
+        gameState.gameRunning = true;
+        startGameTimer();
+        
+        // Generar algunos powerups para el juego
+        setTimeout(() => {
+          spawnPowerup();
+        }, 2000);
+      }
+
+      // NUEVO: Simplificar función para iniciar juego offline
+      function startGameOffline() {
+        if (gameState.players.size < GAME_CONFIG.minPlayers) {
+          alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
+          return;
+        }
+
+        console.log("Iniciando juego en modo offline");
+        gameState.gamePhase = 'countdown';
+        gameState.countdown = 3;
+
+        const countdownInterval = setInterval(() => {
+          gameState.countdown--;
+          
+          if (gameState.countdown <= 0) {
+            clearInterval(countdownInterval);
+            gameState.gamePhase = 'playing';
+            gameState.gameRunning = true;
+            startGameTimer();
+            spawnPowerup();
+            
+            document.getElementById('startGame').style.display = 'none';
+          }
+        }, 1000);
+      }
+
+      // AÑADIR: Función para limpiar jugadores demo
+      function clearDemoPlayers() {
+        console.log("Limpiando jugadores demo...");
+        const realPlayers = new Map();
+        
+        gameState.players.forEach((player, id) => {
+          // Mantener solo jugadores reales (no AI)
+          if (!player.isAI) {
+            realPlayers.set(id, player);
+          } else {
+            // Liberar personaje asignado
+            if (player.characterIndex) {
+              releaseCharacter(player.characterIndex);
+            }
+            console.log(`Removiendo jugador demo: ${id}`);
+          }
+        });
+        
+        gameState.players = realPlayers;
+        
+        // Recalcular prize pool sin demos
+        gameState.prizePool = 0;
+        gameState.players.forEach(player => {
+          gameState.prizePool += player.bet;
+        });
+        
+        updateUI();
+      }
+
+      // MODIFICAR: Función para agregar jugadores demo solo en modo offline completo
+      function addDemoPlayersOfflineMode() {
+        // Solo añadir demos si estamos completamente offline
+        if (gameConnection.connected || walletConnected || gameState.players.size > 0) {
+          console.log("No añadiendo demos - hay conexión o jugadores reales");
+          return;
+        }
+
+        console.log("Añadiendo jugadores demo para modo offline completo");
+        showMessage("Modo demo - Conecta tu wallet para jugar de verdad", 4000);
+
+        // Add some AI players for demo with varied bet amounts
+        const demoPlayers = [
+          { bet: 0.005, color: "#ff6b6b", name: "Demo Small" }, 
+          { bet: 0.025, color: "#4ecdc4", name: "Demo Large" }, 
+          { bet: 0.015, color: "#45b7d1", name: "Demo Medium" },
+        ];
+
+        demoPlayers.forEach((demo, i) => {
+          const playerId = `demo_${i}`;
+          const characterIndex = getNextAvailableCharacter();
+
+          const player = {
+            id: playerId,
+            address: "0xDemo" + Math.random().toString(16).substring(2, 6),
+            bet: demo.bet,
+            x: centerX + (Math.random() - 0.5) * 200,
+            y: centerY + (Math.random() - 0.5) * 200,
+            vx: 0,
+            vy: 0,
+            radius: calculatePlayerSize(demo.bet),
+            color: demo.color,
+            alive: true,
+            powerup: null,
+            powerupEndTime: 0,
+            keys: {},
+            isAI: true,
+            isDemoPlayer: true, // AÑADIR: Marcar explícitamente como demo
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: 0,
+            characterIndex: characterIndex,
+          };
+
+          gameState.players.set(playerId, player);
+          gameState.prizePool += demo.bet;
+
+          console.log(`Demo player ${playerId} creado - personaje ${characterIndex}`);
+        });
+
+        updateUI();
+      }
+
+      // ELIMINAR: La función addDemoPlayers original ya no se necesita
+      // function addDemoPlayers() { ... }
+
+      // MODIFICAR: updateUI para mostrar información sobre demos
+      function updateUI() {
+        document.getElementById("prizePool").textContent =
+          gameState.prizePool.toFixed(3);
+        
+        // MODIFICAR: Mostrar información más clara sobre el tipo de jugadores
+        const realPlayers = Array.from(gameState.players.values()).filter(p => !p.isAI);
+        const demoPlayers = Array.from(gameState.players.values()).filter(p => p.isAI);
+        
+        let playerCountText = `${gameState.players.size}`;
+        if (demoPlayers.length > 0) {
+          playerCountText += ` (${realPlayers.length} real, ${demoPlayers.length} demo)`;
+        }
+        
+        document.getElementById("playerCount").textContent = playerCountText;
+
+        // Update timer
+        if (gameState.gamePhase === "countdown") {
+          document.getElementById("gameTimer").textContent =
+            gameState.countdown || "FIGHT!";
+        } else if (gameState.gamePhase === "playing") {
+          const alivePlayers = getAlivePlayers();
+          let timerText = `${gameState.gameTime}s`;
+
+          // Mostrar información de jugadores vivos
+          timerText += ` (${alivePlayers.length} alive)`;
+
+          // AÑADIR: Indicador especial cuando queda un solo jugador
+          if (alivePlayers.length === 1) {
+            timerText += " 🏆 WINNER!";
+          }
+
+          // En modo de prueba, mostrar información adicional
+          if (GAME_CONFIG.testMode) {
+            if (alivePlayers.length === 1) {
+              timerText += " [TEST MODE - SUCCESS]";
+            } else {
+              timerText += " [TEST MODE]";
+            }
+          }
+
+          document.getElementById("gameTimer").textContent = timerText;
+        } else if (gameState.gamePhase === "waiting") {
+          document.getElementById("gameTimer").textContent =
+            "Waiting... (Use WASD to move)";
+        } else if (gameState.gamePhase === "finished") {
+          const alivePlayers = getAlivePlayers();
+          if (alivePlayers.length === 1) {
+            document.getElementById(
+              "gameTimer"
+            ).textContent = `🏆 Winner: ${alivePlayers[0].address.substring(
+              0,
+              8
+            )}...`;
+          } else {
+            document.getElementById("gameTimer").textContent = "Game Finished";
+          }
+        } else {
+          document.getElementById("gameTimer").textContent = "Waiting...";
+        }
+
+        // Update player list
+        const playerList = document.getElementById("playerList");
+        playerList.innerHTML = "";
+        gameState.players.forEach((player) => {
+          const card = document.createElement("div");
+          card.className = "player-card";
+          card.style.opacity = player.alive ? "1.0" : "0.5"; // Dim eliminated players
+
+          // AÑADIR: Destacar jugadores demo
+          if (player.isAI) {
+            card.style.border = "1px dashed #666";
+            card.style.background = "rgba(100, 100, 100, 0.1)";
+          }
+
+          // AÑADIR: Destacar al ganador
+          if (
+            player.alive &&
+            getAlivePlayers().length === 1 &&
+            gameState.gamePhase === "playing"
+          ) {
+            card.style.border = "2px solid #FFD700";
+            card.style.background = "rgba(255, 215, 0, 0.2)";
+          }
+
+          // MODIFICAR: Mostrar información del tamaño y tipo
+          const sizeInfo = `(Size: ${player.radius.toFixed(0)})`;
+          const typeInfo = player.isAI ? "🤖" : "👤";
+
+          card.innerHTML = `
+            <div style="color: ${player.color}">●</div>
+            <div>${player.address.substring(0, 6)}... ${typeInfo}</div>
+            <div>${player.bet.toFixed(3)} FLOW</div>
+            <div style="font-size: 10px; color: #ccc;">${sizeInfo}</div>
+            <div>${
+              player.alive
+                ? getAlivePlayers().length === 1 &&
+                  gameState.gamePhase === "playing"
+                  ? "👑"
+                  : "🟢"
+                : "💀"
+            }</div>
+          `;
+          playerList.appendChild(card);
+        });
+      }
+
+      // MODIFICAR: startGameOffline para verificar si hay jugadores reales
+      function startGameOffline() {
+        const realPlayers = Array.from(gameState.players.values()).filter(p => !p.isAI);
+        
+        // Si solo hay demos, avisar al usuario
+        if (realPlayers.length === 0 && gameState.players.size > 0) {
+          alert("¡Esto es solo una demo! Conecta tu wallet para jugar de verdad.");
+          console.log("Iniciando juego demo con jugadores AI");
+        } else if (gameState.players.size < GAME_CONFIG.minPlayers) {
+          alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
+          return;
+        }
+
+        console.log("Iniciando juego en modo offline");
+        gameState.gamePhase = 'countdown';
+        gameState.countdown = 3;
+
+        const countdownInterval = setInterval(() => {
+          gameState.countdown--;
+          
+          if (gameState.countdown <= 0) {
+            clearInterval(countdownInterval);
+            gameState.gamePhase = 'playing';
+            gameState.gameRunning = true;
+            startGameTimer();
+            spawnPowerup();
+            
+            document.getElementById('startGame').style.display = 'none';
+          }
+        }, 1000);
       }
     </script>
   </body>
