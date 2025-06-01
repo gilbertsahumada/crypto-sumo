@@ -1,10 +1,7 @@
-// Placeholder ABI for the Crypto Sumo smart contract
-// Replace this with the actual ABI once you have your contract deployed
 
-// Contract address - replace this with your actual contract address when deployed
-const SUMO_CONTRACT_ADDRESS = "0xfE3a6db562402d34cF8319BB6719CaDB8a1098b6"; 
+const SUMO_CONTRACT_ADDRESS = "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489"; 
 
-// Contract ABI - this is just a basic structure, you'll need to replace it with your actual contract ABI
+
 const SUMO_CONTRACT_ABI = [
 	{
 		"inputs": [],
