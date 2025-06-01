@@ -11,6 +11,7 @@
     ></script>
     <script src="./js/sumoContract.js"></script>
     <script src="./js/websocket-client.js"></script>
+    <script src="./js/gameStateService.js"></script>
   </head>
   <body>
     <div class="game-container">
@@ -151,6 +152,9 @@
       const assignedCharacters = new Set();
       let nextCharacterIndex = 1;
 
+      // Variables para el servicio de estado del juego
+      let gameStateService;
+
       // Initialize
       document.addEventListener("DOMContentLoaded", function () {
         loadSumoImages();
@@ -190,6 +194,42 @@
             addDemoPlayers();
           }
         }, 2000);
+
+        // Inicializar servicio de estado del juego (sin provider aún)
+        gameStateService = new GameStateService(
+          "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489",
+          SUMO_CONTRACT_ABI
+        );
+
+        // Configurar callbacks para eventos del juego
+        gameStateService.onGameStarted(() => {
+          console.log("Evento detectado: Juego iniciado en blockchain");
+          if (!gameState.gameRunning) {
+            showMessage("El juego ha comenzado en la blockchain", 3000);
+
+            // Si el juego no está corriendo localmente, iniciarlo
+            if (gameConnection.connected) {
+              // Solicitar al servidor iniciar el juego (sabrá que ya comenzó en blockchain)
+              gameConnection.startGame();
+            } else {
+              // En modo offline, iniciar directamente
+              startGame();
+            }
+          }
+        });
+
+        gameStateService.onGameEnded((winner, amount) => {
+          console.log("Evento detectado: Juego terminado en blockchain");
+          if (gameState.gameRunning) {
+            showMessage("El juego ha terminado en la blockchain", 3000);
+
+            // Si estamos conectados al servidor, el servidor debería detectar esto también
+            // Si estamos en modo offline, finalizar el juego
+            if (!gameConnection.connected) {
+              endGame();
+            }
+          }
+        });
       });
 
       // Cargar imágenes de sumos
@@ -209,9 +249,7 @@
 
         // Añadir evento de carga para mostrar progreso
         let imagesLoaded = 0;
-        const totalImages = Object.keys(sumoImages).length;
-
-        Object.values(sumoImages).forEach((img) => {
+        const totalImages = Object.keys(sumoImages).forEach((img) => {
           img.onload = () => {
             imagesLoaded++;
             console.log(`Cargando imágenes: ${imagesLoaded}/${totalImages}`);
@@ -342,6 +380,15 @@
           // AÑADIR: Verificar si el jugador ya está en el juego
           await checkIfPlayerAlreadyInGame();
 
+          // Cuando el signer esté disponible, inicializar el servicio de estado
+          if (signer) {
+            const initialized = await gameStateService.initialize(signer);
+            if (initialized) {
+              console.log(
+                "Servicio de estado del juego inicializado correctamente"
+              );
+            }
+          }
         } catch (error) {
           console.error("Error connecting wallet:", error);
           alert(`Error connecting wallet: ${error.message || error}`);
@@ -375,12 +422,13 @@
 
           // Verificar si mi dirección está en la lista
           const isPlayerInGame = activePlayers.some(
-            (playerAddress) => playerAddress.toLowerCase() === walletAddress.toLowerCase()
+            (playerAddress) =>
+              playerAddress.toLowerCase() === walletAddress.toLowerCase()
           );
 
           if (isPlayerInGame) {
             console.log("Player is already in the game, auto-joining...");
-            
+
             // Obtener información del jugador del contrato
             const playerInfo = await contract.getPlayerInfo(walletAddress);
             console.log("Player info from contract:", playerInfo);
@@ -419,21 +467,28 @@
             };
 
             gameState.players.set(playerId, player);
-            
+
             // Actualizar el prize pool local (obteniendo info de otros jugadores también)
             gameState.prizePool = 0;
             for (const playerAddress of activePlayers) {
               const playerData = await contract.getPlayerInfo(playerAddress);
-              gameState.prizePool += parseFloat(ethers.formatEther(playerData.stakingAmount));
+              gameState.prizePool += parseFloat(
+                ethers.formatEther(playerData.stakingAmount)
+              );
             }
 
             // Crear jugadores para otros participantes si no existen localmente
             for (const playerAddress of activePlayers) {
-              if (playerAddress.toLowerCase() !== walletAddress.toLowerCase() && 
-                  !gameState.players.has(playerAddress)) {
-                
-                const otherPlayerInfo = await contract.getPlayerInfo(playerAddress);
-                const otherBet = parseFloat(ethers.formatEther(otherPlayerInfo.stakingAmount));
+              if (
+                playerAddress.toLowerCase() !== walletAddress.toLowerCase() &&
+                !gameState.players.has(playerAddress)
+              ) {
+                const otherPlayerInfo = await contract.getPlayerInfo(
+                  playerAddress
+                );
+                const otherBet = parseFloat(
+                  ethers.formatEther(otherPlayerInfo.stakingAmount)
+                );
                 const otherCharacterIndex = getNextAvailableCharacter();
 
                 const otherPlayer = {
@@ -488,10 +543,10 @@
             }
 
             showMessage(`✅ Rejoined existing game with ${stakingAmount} FLOW!`, 4000);
-            
+
           } else {
             console.log("Player is not in any active game");
-            
+
             // Verificar si hay un juego activo sin el jugador
             const isGameActive = await contract.getGameState();
             if (isGameActive) {
@@ -505,9 +560,27 @@
             }
           }
 
+          // Si estamos conectados al WebSocket, usar el servidor para verificar
+          if (gameConnection.connected) {
+            gameConnection.checkBlockchainState(walletAddress);
+
+            // Configurar callback para la respuesta
+            gameConnection.setCallback("onBlockchainStateResult", (data) => {
+              if (data.isInGame) {
+                console.log(
+                  "Jugador verificado en blockchain a través del servidor"
+                );
+                // Auto-unirse al juego existente
+                gameConnection.joinExistingGame(
+                  walletAddress,
+                  parseFloat(stakingAmount)
+                );
+              }
+            });
+          }
         } catch (error) {
           console.error("Error checking if player is in game:", error);
-          
+
           // Si hay error al comunicarse con el contrato, permitir continuar normalmente
           if (error.message.includes("revert") || error.message.includes("call revert")) {
             console.log("Contract call reverted, probably no active game");
@@ -516,7 +589,7 @@
             console.warn("Contract interaction failed, continuing in offline mode");
             showMessage("Unable to verify game state, continuing offline", 3000);
           }
-          
+
           // Mantener la funcionalidad normal del juego
           document.getElementById("joinGame").disabled = false;
           document.getElementById("joinGame").textContent = "Join Game";
@@ -551,6 +624,11 @@
           if (gameState.myPlayerId) {
             // This would depend on your game logic
             // Possibly remove player or mark as disconnected
+          }
+
+          // Limpiar el servicio de estado
+          if (gameStateService) {
+            gameStateService.cleanup();
           }
         } catch (error) {
           console.error("Error disconnecting wallet:", error);
@@ -1072,193 +1150,193 @@
 
       // Game functions
       async function startGame() {
-            // Verificar si hay suficientes jugadores según la configuración
-            if (gameState.players.size < GAME_CONFIG.minPlayers) {
-                alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
-                return;
-            }
+        // Verificar si hay suficientes jugadores según la configuración
+        if (gameState.players.size < GAME_CONFIG.minPlayers) {
+          alert(`Necesitas al menos ${GAME_CONFIG.minPlayers} jugador(es) para comenzar!`);
+          return;
+        }
 
-            // Si no hay signer o no estamos conectados al servidor, usar modo offline
-            if (!signer || !gameConnection.connected) {
-                startGameOffline();
-                return;
+        // Si no hay signer o no estamos conectados al servidor, usar modo offline
+        if (!signer || !gameConnection.connected) {
+          startGameOffline();
+          return;
+        }
+
+        try {
+          // Verificar red correcta
+          const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+          if (chainId !== FLOW_TESTNET.chainId) {
+            alert('Please switch to Flow Testnet to start the game!');
+            const switched = await switchToFlowTestnet();
+            if (!switched) {
+              showManualNetworkInstructions();
+              return;
             }
+          }
+
+          // Mostrar que estamos procesando
+          document.getElementById('startGame').disabled = true;
+          document.getElementById('startGame').textContent = 'Starting...';
+          showMessage('Starting game on blockchain...', 2000);
+
+          // Crear instancia del contrato
+          const contract = new ethers.Contract(SUMO_CONTRACT_ADDRESS, SUMO_CONTRACT_ABI, signer);
+
+          // Verificar que el juego no esté ya en progreso
+          const currentGameState = await contract.getGameState();
+          if (currentGameState) {
+            alert('Game is already in progress on the blockchain!');
+            document.getElementById('startGame').disabled = false;
+            document.getElementById('startGame').textContent = 'Start Game';
+            return;
+          }
+
+          // Estimar gas
+          let gasEstimate;
+          try {
+            gasEstimate = await contract.startGame.estimateGas();
+            console.log("Gas estimate for startGame:", gasEstimate.toString());
+          } catch (estimateError) {
+            console.warn("Gas estimation failed, using default:", estimateError);
+            gasEstimate = BigInt(500000); // Gas por defecto más alto para startGame
+          }
+
+          // Añadir 20% de buffer al gas estimado
+          const gasLimit = gasEstimate + (gasEstimate * BigInt(20) / BigInt(100));
+
+          // Ejecutar la función startGame del contrato
+          const tx = await contract.startGame({
+            gasLimit: gasLimit
+          });
+
+          console.log("StartGame transaction sent:", tx.hash);
+          showMessage(`Starting game... TX: ${tx.hash.substring(0, 10)}...`);
+
+          // Esperar confirmación de la transacción
+          const receipt = await tx.wait();
+          console.log("StartGame transaction confirmed:", receipt);
+
+          if (receipt.status === 1) {
+            console.log("StartGame transaction successful");
+
+            // CAPTURAR LOS VALORES DE RETORNO
+            // Nota: Los valores de retorno de funciones que modifican estado (no view/pure) 
+            // no están disponibles directamente en el receipt. Necesitamos usar call() para obtenerlos.
 
             try {
-                // Verificar red correcta
-                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                if (chainId !== FLOW_TESTNET.chainId) {
-                    alert('Please switch to Flow Testnet to start the game!');
-                    const switched = await switchToFlowTestnet();
-                    if (!switched) {
-                        showManualNetworkInstructions();
-                        return;
-                    }
-                }
+              // Hacer una llamada estática para obtener los valores de retorno
+              // (esto simula la llamada sin ejecutarla realmente)
+              const powerupData = await contract.startGame.staticCall();
 
-                // Mostrar que estamos procesando
-                document.getElementById('startGame').disabled = true;
-                document.getElementById('startGame').textContent = 'Starting...';
-                showMessage('Starting game on blockchain...', 2000);
+              console.log("Powerup data from contract:", powerupData);
 
-                // Crear instancia del contrato
-                const contract = new ethers.Contract(SUMO_CONTRACT_ADDRESS, SUMO_CONTRACT_ABI, signer);
+              // Los valores se retornan como un array
+              // return (power1, random_time1, power2, random_time2, power3, random_time3);
+              const [power1, time1, power2, time2, power3, time3] = powerupData;
 
-                // Verificar que el juego no esté ya en progreso
-                const currentGameState = await contract.getGameState();
-                if (currentGameState) {
-                    alert('Game is already in progress on the blockchain!');
-                    document.getElementById('startGame').disabled = false;
-                    document.getElementById('startGame').textContent = 'Start Game';
-                    return;
-                }
+              console.log("Extracted powerups:");
+              console.log("Powerup 1:", power1, "at time:", time1.toString());
+              console.log("Powerup 2:", power2, "at time:", time2.toString());
+              console.log("Powerup 3:", power3, "at time:", time3.toString());
 
-                // Estimar gas
-                let gasEstimate;
-                try {
-                    gasEstimate = await contract.startGame.estimateGas();
-                    console.log("Gas estimate for startGame:", gasEstimate.toString());
-                } catch (estimateError) {
-                    console.warn("Gas estimation failed, using default:", estimateError);
-                    gasEstimate = BigInt(500000); // Gas por defecto más alto para startGame
-                }
+              // Crear powerups en el juego local con los datos del contrato
+              createPowerupsFromContract([
+                { type: power1.toUpperCase(), spawnTime: Number(time1) },
+                { type: power2.toUpperCase(), spawnTime: Number(time2) },
+                { type: power3.toUpperCase(), spawnTime: Number(time3) }
+              ]);
 
-                // Añadir 20% de buffer al gas estimado
-                const gasLimit = gasEstimate + (gasEstimate * BigInt(20) / BigInt(100));
+              showMessage(`🎮 Game started! Powerups: ${power1}, ${power2}, ${power3}`, 4000);
 
-                // Ejecutar la función startGame del contrato
-                const tx = await contract.startGame({
-                    gasLimit: gasLimit
-                });
-
-                console.log("StartGame transaction sent:", tx.hash);
-                showMessage(`Starting game... TX: ${tx.hash.substring(0, 10)}...`);
-
-                // Esperar confirmación de la transacción
-                const receipt = await tx.wait();
-                console.log("StartGame transaction confirmed:", receipt);
-
-                if (receipt.status === 1) {
-                    console.log("StartGame transaction successful");
-
-                    // CAPTURAR LOS VALORES DE RETORNO
-                    // Nota: Los valores de retorno de funciones que modifican estado (no view/pure) 
-                    // no están disponibles directamente en el receipt. Necesitamos usar call() para obtenerlos.
-                    
-                    try {
-                        // Hacer una llamada estática para obtener los valores de retorno
-                        // (esto simula la llamada sin ejecutarla realmente)
-                        const powerupData = await contract.startGame.staticCall();
-                        
-                        console.log("Powerup data from contract:", powerupData);
-                        
-                        // Los valores se retornan como un array
-                        // return (power1, random_time1, power2, random_time2, power3, random_time3);
-                        const [power1, time1, power2, time2, power3, time3] = powerupData;
-                        
-                        console.log("Extracted powerups:");
-                        console.log("Powerup 1:", power1, "at time:", time1.toString());
-                        console.log("Powerup 2:", power2, "at time:", time2.toString());
-                        console.log("Powerup 3:", power3, "at time:", time3.toString());
-                        
-                        // Crear powerups en el juego local con los datos del contrato
-                        createPowerupsFromContract([
-                            { type: power1.toUpperCase(), spawnTime: Number(time1) },
-                            { type: power2.toUpperCase(), spawnTime: Number(time2) },
-                            { type: power3.toUpperCase(), spawnTime: Number(time3) }
-                        ]);
-                        
-                        showMessage(`🎮 Game started! Powerups: ${power1}, ${power2}, ${power3}`, 4000);
-                        
-                    } catch (callError) {
-                        console.warn("Could not get powerup data from contract:", callError);
-                        showMessage("Game started successfully! 🎮", 3000);
-                    }
-
-                    // ALTERNATIVA: Escuchar eventos del contrato para capturar los powerups
-                    try {
-                        // Buscar el evento PowerUpCreated en los logs del receipt
-                        const powerUpCreatedEvent = receipt.logs.find(log => {
-                            try {
-                                const parsedLog = contract.interface.parseLog(log);
-                                return parsedLog.name === 'PowerUpCreated';
-                            } catch (e) {
-                                return false;
-                            }
-                        });
-
-                        if (powerUpCreatedEvent) {
-                            const parsedEvent = contract.interface.parseLog(powerUpCreatedEvent);
-                            console.log("PowerUpCreated event found:", parsedEvent.args);
-                            
-                            // Extraer datos del evento
-                            const [power1, time1, power2, time2, power3, time3] = parsedEvent.args;
-                            
-                            console.log("Powerups from event:");
-                            console.log("Powerup 1:", power1, "at time:", time1.toString());
-                            console.log("Powerup 2:", power2, "at time:", time2.toString());
-                            console.log("Powerup 3:", power3, "at time:", time3.toString());
-                            
-                            // Usar estos datos para crear powerups
-                            createPowerupsFromContract([
-                                { type: power1.toUpperCase(), spawnTime: Number(time1) },
-                                { type: power2.toUpperCase(), spawnTime: Number(time2) },
-                                { type: power3.toUpperCase(), spawnTime: Number(time3) }
-                            ]);
-                        }
-                    } catch (eventError) {
-                        console.warn("Error parsing PowerUpCreated event:", eventError);
-                    }
-
-                    // Iniciar el juego localmente después de la confirmación blockchain
-                    if (gameConnection.connected) {
-                        gameConnection.startGame();
-                    } else {
-                        startGameOffline();
-                    }
-
-                    document.getElementById('startGame').style.display = 'none';
-
-                } else {
-                    throw new Error("Transaction failed");
-                }
-
-            } catch (error) {
-                console.error("Error starting game on blockchain:", error);
-                
-                let errorMessage = "Failed to start game";
-                
-                // Manejar errores específicos
-                if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
-                    errorMessage = "Transaction would fail. Game may already be in progress.";
-                } else if (error.code === 'INSUFFICIENT_FUNDS') {
-                    errorMessage = "Insufficient funds for transaction.";
-                } else if (error.code === 'USER_REJECTED') {
-                    errorMessage = "Transaction rejected by user.";
-                } else if (error.message.includes('revert')) {
-                    const revertMatch = error.message.match(/revert (.+?)(?:\s|$)/);
-                    if (revertMatch) {
-                        errorMessage = `Contract error: ${revertMatch[1]}`;
-                    } else {
-                        errorMessage = "Transaction reverted by contract.";
-                    }
-                } else if (error.message) {
-                    errorMessage = error.message;
-                }
-
-                alert(`❌ ${errorMessage}`);
-                showMessage(`Failed to start game: ${errorMessage}`, 4000);
-
-                // Restaurar estado del botón
-                document.getElementById('startGame').disabled = false;
-                document.getElementById('startGame').textContent = 'Start Game';
-
-                // Fallback a modo offline si falla
-                if (confirm('Start game in offline mode instead?')) {
-                    startGameOffline();
-                }
+            } catch (callError) {
+              console.warn("Could not get powerup data from contract:", callError);
+              showMessage("Game started successfully! 🎮", 3000);
             }
+
+            // ALTERNATIVA: Escuchar eventos del contrato para capturar los powerups
+            try {
+              // Buscar el evento PowerUpCreated en los logs del receipt
+              const powerUpCreatedEvent = receipt.logs.find(log => {
+                try {
+                  const parsedLog = contract.interface.parseLog(log);
+                  return parsedLog.name === 'PowerUpCreated';
+                } catch (e) {
+                  return false;
+                }
+              });
+
+              if (powerUpCreatedEvent) {
+                const parsedEvent = contract.interface.parseLog(powerUpCreatedEvent);
+                console.log("PowerUpCreated event found:", parsedEvent.args);
+
+                // Extraer datos del evento
+                const [power1, time1, power2, time2, power3, time3] = parsedEvent.args;
+
+                console.log("Powerups from event:");
+                console.log("Powerup 1:", power1, "at time:", time1.toString());
+                console.log("Powerup 2:", power2, "at time:", time2.toString());
+                console.log("Powerup 3:", power3, "at time:", time3.toString());
+
+                // Usar estos datos para crear powerups
+                createPowerupsFromContract([
+                  { type: power1.toUpperCase(), spawnTime: Number(time1) },
+                  { type: power2.toUpperCase(), spawnTime: Number(time2) },
+                  { type: power3.toUpperCase(), spawnTime: Number(time3) }
+                ]);
+              }
+            } catch (eventError) {
+              console.warn("Error parsing PowerUpCreated event:", eventError);
+            }
+
+            // Iniciar el juego localmente después de la confirmación blockchain
+            if (gameConnection.connected) {
+              gameConnection.startGame();
+            } else {
+              startGameOffline();
+            }
+
+            document.getElementById('startGame').style.display = 'none';
+
+          } else {
+            throw new Error("Transaction failed");
+          }
+
+        } catch (error) {
+          console.error("Error starting game on blockchain:", error);
+
+          let errorMessage = "Failed to start game";
+
+          // Manejar errores específicos
+          if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
+            errorMessage = "Transaction would fail. Game may already be in progress.";
+          } else if (error.code === 'INSUFFICIENT_FUNDS') {
+            errorMessage = "Insufficient funds for transaction.";
+          } else if (error.code === 'USER_REJECTED') {
+            errorMessage = "Transaction rejected by user.";
+          } else if (error.message.includes('revert')) {
+            const revertMatch = error.message.match(/revert (.+?)(?:\s|$)/);
+            if (revertMatch) {
+              errorMessage = `Contract error: ${revertMatch[1]}`;
+            } else {
+              errorMessage = "Transaction reverted by contract.";
+            }
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+
+          alert(`❌ ${errorMessage}`);
+          showMessage(`Failed to start game: ${errorMessage}`, 4000);
+
+          // Restaurar estado del botón
+          document.getElementById('startGame').disabled = false;
+          document.getElementById('startGame').textContent = 'Start Game';
+
+          // Fallback a modo offline si falla
+          if (confirm('Start game in offline mode instead?')) {
+            startGameOffline();
+          }
         }
+      }
 
       function startGameTimer() {
         gameState.gameTime = 60;
@@ -1305,10 +1383,10 @@
         // Lógica para mostrar botón de claim winner
         if (alivePlayers.length === 1) {
           const winner = alivePlayers[0];
-          
+
           // Verificar si el ganador soy yo
           const isMyWin = winner.id === gameState.myPlayerId;
-          
+
           setTimeout(() => {
             // Crear modal para el resultado del juego
             const gameEndModal = document.createElement("div");
@@ -1519,7 +1597,7 @@
               const gameEndedEvent = events.find(
                 (event) => event.name === "GameEnded"
               );
-              
+
               if (gameEndedEvent) {
                 const [winner, prizeAmount] = gameEndedEvent.args;
                 const prizeInEther = ethers.formatEther(prizeAmount);
@@ -1529,7 +1607,7 @@
                 });
 
                 showMessage(`🎉 Prize claimed! ${prizeInEther} FLOW transferred to your wallet!`, 6000);
-                
+
                 // Mostrar modal de éxito
                 setTimeout(() => {
                   const successModal = document.createElement("div");

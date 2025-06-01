@@ -2,6 +2,8 @@ const WebSocket = require('ws');
 const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+// AÑADIR: Importar ethers para interactuar con la blockchain
+const ethers = require('ethers');
 
 // Configuración del servidor Express
 const app = express();
@@ -58,6 +60,457 @@ function releaseCharacter(characterIndex) {
     assignedCharacters.delete(characterIndex);
 }
 
+// AÑADIR: Configuración de la conexión a la blockchain
+const FLOW_TESTNET = {
+  chainId: "0x221", // 545 en decimal
+  chainName: "Flow Testnet",
+  rpcUrls: ["https://testnet.evm.nodes.onflow.org"],
+  nativeCurrency: {
+    name: "FLOW",
+    symbol: "FLOW",
+    decimals: 18,
+  },
+  blockExplorerUrls: ["https://testnet.flowscan.org"],
+};
+
+// AÑADIR: Dirección del contrato y ABI
+const SUMO_CONTRACT_ADDRESS = "0x74C5Dc02eC6D842A72c21aA7f351be48Bcf2f489";
+let SUMO_CONTRACT_ABI;
+try {
+  SUMO_CONTRACT_ABI = require('../js/sumoContract.js').SUMO_CONTRACT_ABI;
+} catch (error) {
+  console.log('No se pudo cargar el ABI del archivo, usando versión interna');
+  // Aquí incluiría una versión mínima del ABI con los eventos y funciones necesarias
+  SUMO_CONTRACT_ABI = [
+    {
+      "anonymous": false,
+      "inputs": [{"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}],
+      "name": "GameStarted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {"indexed": true, "internalType": "address", "name": "player", "type": "address"},
+        {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
+      ],
+      "name": "PlayerJoined",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "getGameState",
+      "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getActivePlayers",
+      "outputs": [{"internalType": "address[]", "name": "", "type": "address[]"}],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ];
+}
+
+// AÑADIR: Configurar proveedor y contrato
+let provider;
+let contract;
+let blockchainConnected = false;
+
+// AÑADIR: Función para inicializar conexión a la blockchain
+async function initBlockchainConnection() {
+  try {
+    provider = new ethers.providers.JsonRpcProvider(FLOW_TESTNET.rpcUrls[0]);
+    contract = new ethers.Contract(SUMO_CONTRACT_ADDRESS, SUMO_CONTRACT_ABI, provider);
+    
+    // Verificar conexión
+    const blockNumber = await provider.getBlockNumber();
+    console.log(`Conectado a Flow Testnet - Bloque actual: ${blockNumber}`);
+    blockchainConnected = true;
+    
+    // Empezar a escuchar eventos
+    setupContractEventListeners();
+    
+    // Verificar estado inicial del juego
+    syncGameStateWithBlockchain();
+    
+    // Sincronizar periódicamente (cada 30 segundos)
+    setInterval(syncGameStateWithBlockchain, 30000);
+    
+    return true;
+  } catch (error) {
+    console.error('Error conectando a la blockchain:', error);
+    blockchainConnected = false;
+    return false;
+  }
+}
+
+// AÑADIR: Configurar listeners de eventos del contrato
+function setupContractEventListeners() {
+  if (!contract || !blockchainConnected) return;
+  
+  // Listener para evento GameStarted
+  contract.on('GameStarted', (timestamp) => {
+    console.log(`Evento GameStarted recibido - timestamp: ${timestamp}`);
+    
+    // Verificar si debemos actualizar el estado del juego
+    if (!gameState.gameRunning && gameState.gamePhase !== 'playing') {
+      console.log('Iniciando juego en el servidor debido a evento GameStarted en la blockchain');
+      // Iniciar juego inmediatamente sin countdown ya que ya empezó en la blockchain
+      gameState.gamePhase = 'playing';
+      gameState.gameRunning = true;
+      
+      // Obtener información de powerups y comenzar el juego
+      getPowerupsFromBlockchain().then(powerups => {
+        if (powerups && powerups.length > 0) {
+          // Crear powerups en el servidor basados en los datos de la blockchain
+          createPowerupsFromBlockchain(powerups);
+        }
+        
+        startGameTimer();
+        broadcastGameState();
+      });
+    }
+  });
+  
+  // Listener para evento PlayerJoined
+  contract.on('PlayerJoined', (playerAddress, amount) => {
+    console.log(`Evento PlayerJoined recibido - jugador: ${playerAddress}, cantidad: ${ethers.utils.formatEther(amount)} FLOW`);
+    
+    // Verificar si el jugador ya existe en nuestro estado
+    const existingPlayer = Array.from(gameState.players.values()).find(p => 
+      p.address.toLowerCase() === playerAddress.toLowerCase()
+    );
+    
+    if (!existingPlayer) {
+      console.log(`Añadiendo jugador ${playerAddress} al estado del servidor desde evento blockchain`);
+      
+      // Crear jugador con datos del evento
+      const playerId = uuidv4();
+      const betAmount = parseFloat(ethers.utils.formatEther(amount));
+      const characterIndex = getNextAvailableCharacter();
+      
+      // Añadir jugador al estado
+      gameState.players.set(playerId, {
+        id: playerId,
+        address: playerAddress,
+        bet: betAmount,
+        x: 300 + (Math.random() - 0.5) * 200,
+        y: 300 + (Math.random() - 0.5) * 200,
+        vx: 0,
+        vy: 0,
+        radius: calculatePlayerSize(betAmount),
+        color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+        alive: true,
+        powerup: null,
+        powerupEndTime: 0,
+        keys: {},
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: 0,
+        characterIndex: characterIndex,
+        fromBlockchain: true // Marcar que vino de un evento blockchain
+      });
+      
+      gameState.prizePool += betAmount;
+      
+      // AÑADIR: Iniciar física de sala de espera si es el primer jugador
+      if (gameState.players.size === 1 && gameState.gamePhase === 'waiting') {
+        startWaitingRoomPhysics();
+      }
+      
+      broadcastGameState();
+      
+      // Verificar si el juego debe comenzar (último jugador)
+      checkIfGameShouldAutostart();
+    }
+  });
+}
+
+// AÑADIR: Función para calcular tamaño del jugador (misma que en el cliente)
+function calculatePlayerSize(bet) {
+  const minSize = 20;
+  const maxSize = 50;
+  const scaleFactor = 1000;
+  
+  const calculatedSize = minSize + (bet * scaleFactor);
+  return Math.max(minSize, Math.min(maxSize, calculatedSize));
+}
+
+// AÑADIR: Sincronizar estado del juego con la blockchain
+async function syncGameStateWithBlockchain() {
+  if (!contract || !blockchainConnected) return;
+  
+  try {
+    console.log('Sincronizando estado del juego con la blockchain...');
+    
+    // 1. Verificar si el juego está activo en la blockchain
+    const isGameActive = await contract.getGameState();
+    console.log(`Estado del juego en blockchain: ${isGameActive ? 'activo' : 'inactivo'}`);
+    
+    // 2. Obtener lista de jugadores activos
+    const activePlayers = await contract.getActivePlayers();
+    console.log(`Jugadores activos en blockchain: ${activePlayers.length}`);
+    
+    // Si el juego está activo en la blockchain pero no en el servidor, iniciar el juego
+    if (isGameActive && !gameState.gameRunning) {
+      console.log('Juego activo en blockchain pero no en servidor, iniciando...');
+      
+      // Iniciar juego inmediatamente sin countdown ya que ya empezó en la blockchain
+      gameState.gamePhase = 'playing';
+      gameState.gameRunning = true;
+      
+      // Obtener información de powerups y comenzar el juego
+      const powerups = await getPowerupsFromBlockchain();
+      if (powerups && powerups.length > 0) {
+        createPowerupsFromBlockchain(powerups);
+      }
+      
+      startGameTimer();
+      broadcastGameState();
+    }
+    // Si el juego no está activo en blockchain pero sí en servidor, terminar el juego
+    else if (!isGameActive && gameState.gameRunning) {
+      console.log('Juego inactivo en blockchain pero activo en servidor, terminando...');
+      endGame();
+    }
+    
+    // 3. Sincronizar jugadores
+    syncPlayersWithBlockchain(activePlayers);
+    
+  } catch (error) {
+    console.error('Error sincronizando con blockchain:', error);
+  }
+}
+
+// AÑADIR: Sincronizar jugadores con la blockchain
+async function syncPlayersWithBlockchain(activePlayers) {
+  if (!activePlayers || !Array.isArray(activePlayers)) return;
+  
+  try {
+    // Crear conjunto de direcciones de jugadores de la blockchain para búsqueda rápida
+    const blockchainPlayerAddresses = new Set(
+      activePlayers.map(addr => addr.toLowerCase())
+    );
+    
+    // 1. Verificar jugadores en el servidor que ya no están en la blockchain
+    for (const [playerId, player] of gameState.players.entries()) {
+      const isInBlockchain = blockchainPlayerAddresses.has(player.address.toLowerCase());
+      
+      if (!isInBlockchain) {
+        console.log(`Jugador ${player.address} ya no está en la blockchain, eliminando...`);
+        
+        // Liberar el personaje asignado
+        if (player.characterIndex) {
+          releaseCharacter(player.characterIndex);
+        }
+        
+        // Eliminar del estado del servidor
+        gameState.players.delete(playerId);
+      }
+    }
+    
+    // 2. Añadir jugadores de la blockchain que no están en el servidor
+    for (const playerAddress of activePlayers) {
+      const normalizedAddress = playerAddress.toLowerCase();
+      
+      // Verificar si este jugador ya existe en nuestro estado
+      const existingPlayer = Array.from(gameState.players.values()).find(p => 
+        p.address.toLowerCase() === normalizedAddress
+      );
+      
+      if (!existingPlayer) {
+        try {
+          // Obtener información del jugador desde el contrato
+          const playerInfo = await contract.getPlayerInfo(playerAddress);
+          const betAmount = parseFloat(ethers.utils.formatEther(playerInfo.stakingAmount));
+          
+          console.log(`Añadiendo jugador ${playerAddress} al estado del servidor desde sincronización`);
+          
+          // Crear nuevo jugador
+          const playerId = uuidv4();
+          const characterIndex = getNextAvailableCharacter();
+          
+          gameState.players.set(playerId, {
+            id: playerId,
+            address: playerAddress,
+            bet: betAmount,
+            x: 300 + (Math.random() - 0.5) * 200,
+            y: 300 + (Math.random() - 0.5) * 200,
+            vx: 0,
+            vy: 0,
+            radius: calculatePlayerSize(betAmount),
+            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+            alive: true,
+            powerup: null,
+            powerupEndTime: 0,
+            keys: {},
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: 0,
+            characterIndex: characterIndex,
+            fromBlockchain: true
+          });
+          
+          gameState.prizePool += betAmount;
+        } catch (error) {
+          console.error(`Error obteniendo info del jugador ${playerAddress}:`, error);
+        }
+      }
+    }
+    
+    // Actualizar el premio total
+    recalculatePrizePool();
+    
+    // Difundir el estado actualizado
+    broadcastGameState();
+    
+  } catch (error) {
+    console.error('Error sincronizando jugadores con blockchain:', error);
+  }
+}
+
+// AÑADIR: Recalcular el premio total basado en las apuestas de los jugadores
+function recalculatePrizePool() {
+  gameState.prizePool = 0;
+  for (const player of gameState.players.values()) {
+    gameState.prizePool += player.bet;
+  }
+}
+
+// AÑADIR: Verificar si el juego debe comenzar automáticamente
+async function checkIfGameShouldAutostart() {
+  if (!contract || !blockchainConnected) return;
+  
+  try {
+    // Obtener el estado del juego desde la blockchain
+    const isGameActive = await contract.getGameState();
+    
+    // Si el juego está activo en la blockchain pero no en el servidor, iniciarlo
+    if (isGameActive && !gameState.gameRunning) {
+      console.log('Juego detectado como activo en blockchain, iniciando automáticamente...');
+      
+      // Iniciar juego sin countdown
+      gameState.gamePhase = 'playing';
+      gameState.gameRunning = true;
+      
+      // Obtener powerups y comenzar
+      const powerups = await getPowerupsFromBlockchain();
+      if (powerups && powerups.length > 0) {
+        createPowerupsFromBlockchain(powerups);
+      }
+      
+      startGameTimer();
+      broadcastGameState();
+    }
+  } catch (error) {
+    console.error('Error verificando autostart del juego:', error);
+  }
+}
+
+// AÑADIR: Obtener información de powerups desde la blockchain
+async function getPowerupsFromBlockchain() {
+  if (!contract || !blockchainConnected) return [];
+  
+  try {
+    // Intentar obtener powerups desde el contrato
+    // Nota: Esto depende de cómo está implementado tu contrato, ajústalo según sea necesario
+    const powerUps = await contract.getPowerUps();
+    const spawnTimes = await contract.getPowerUpSpawnTimes();
+    
+    // Si los métodos anteriores no existen, devolver array vacío
+    if (!powerUps || !spawnTimes) return [];
+    
+    // Formatear los datos de powerups
+    const result = [];
+    for (let i = 0; i < powerUps.length && i < spawnTimes.length; i++) {
+      result.push({
+        type: powerUps[i].toUpperCase(),
+        spawnTime: parseInt(spawnTimes[i].toString())
+      });
+    }
+    
+    return result;
+  } catch (error) {
+    console.warn('Error obteniendo powerups de la blockchain:', error);
+    return [];
+  }
+}
+
+// AÑADIR: Crear powerups basados en datos de la blockchain
+function createPowerupsFromBlockchain(powerupData) {
+  if (!powerupData || !Array.isArray(powerupData) || powerupData.length === 0) return;
+  
+  // Limpiar powerups existentes
+  gameState.powerups = [];
+  
+  const centerX = 300;
+  const centerY = 300;
+  const ringRadius = 280;
+  
+  // Crear powerups basados en los datos recibidos
+  powerupData.forEach(powerup => {
+    // Calcular posición basada en algún algoritmo determinista usando spawnTime como semilla
+    const seed = powerup.spawnTime % 1000;
+    const angle = (seed / 1000) * Math.PI * 2;
+    const distance = ringRadius * 0.4 + (seed % 100) / 100 * ringRadius * 0.3;
+    
+    gameState.powerups.push({
+      type: powerup.type,
+      x: centerX + Math.cos(angle) * distance,
+      y: centerY + Math.sin(angle) * distance,
+      rotation: 0
+    });
+  });
+  
+  console.log(`Creados ${gameState.powerups.length} powerups desde datos de blockchain`);
+}
+
+// MODIFICAR: Incluir verificación blockchain en startGame
+async function startGame() {
+  // Verificar si el juego ya está activo en la blockchain antes de iniciar
+  if (blockchainConnected) {
+    try {
+      const isGameActive = await contract.getGameState();
+      if (isGameActive) {
+        console.log('El juego ya está activo en la blockchain, sincronizando...');
+        await syncGameStateWithBlockchain();
+        return; // No continuar con el inicio normal si ya está activo
+      }
+    } catch (error) {
+      console.warn('Error verificando estado del juego en blockchain:', error);
+      // Continuar con el inicio normal si hay error en la verificación
+    }
+  }
+
+  // Código existente para iniciar el juego
+  gameState.gamePhase = 'countdown';
+  gameState.countdown = 3;
+  broadcastGameState();
+  
+  const countdownInterval = setInterval(() => {
+    gameState.countdown--;
+    broadcastGameState();
+    
+    if (gameState.countdown <= 0) {
+      clearInterval(countdownInterval);
+      gameState.gamePhase = 'playing';
+      gameState.gameRunning = true;
+      startGameTimer();
+      spawnPowerup();
+    }
+  }, 1000);
+}
+
+// Inicializar la conexión blockchain al arrancar el servidor
+initBlockchainConnection().then(connected => {
+  if (connected) {
+    console.log('Conexión blockchain establecida con éxito');
+  } else {
+    console.log('Servidor iniciado sin conexión blockchain. Algunas funciones estarán limitadas.');
+  }
+});
+
 // Manejar conexiones WebSocket
 wss.on('connection', (ws) => {
   const clientId = uuidv4();
@@ -102,7 +555,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Procesar mensajes del cliente
+// MODIFICAR: Actualizar handleClientMessage para incluir validación blockchain
 function handleClientMessage(ws, clientId, data) {
   console.log(`Mensaje recibido de ${clientId}:`, data.type);
   
@@ -110,61 +563,36 @@ function handleClientMessage(ws, clientId, data) {
     case 'joinGame':
       console.log(`Jugador ${clientId} uniéndose con apuesta de ${data.bet} FLOW`);
       
-      // MODIFICAR: Asignar personaje único al jugador
-      const characterIndex = getNextAvailableCharacter();
-      
-      // MODIFICAR: Cálculo mejorado del tamaño basado en la apuesta
-      const calculatePlayerSize = (bet) => {
-        // Tamaño base mínimo
-        const minSize = 20;
-        // Tamaño máximo para evitar personajes demasiado grandes
-        const maxSize = 50;
-        // Factor de escala: cada 0.01 FLOW añade ~10 unidades de radio
-        const scaleFactor = 1000;
-        
-        const calculatedSize = minSize + (bet * scaleFactor);
-        return Math.max(minSize, Math.min(maxSize, calculatedSize));
-      };
-      
-      // Añadir jugador al juego
-      gameState.players.set(clientId, {
-        id: clientId,
-        address: data.address,
-        bet: data.bet,
-        x: 300 + (Math.random() - 0.5) * 200,
-        y: 300 + (Math.random() - 0.5) * 200,
-        vx: 0,
-        vy: 0,
-        radius: calculatePlayerSize(data.bet), // Usar nueva función de cálculo
-        color: data.color || `hsl(${Math.random() * 360}, 70%, 60%)`,
-        alive: true,
-        powerup: null,
-        powerupEndTime: 0,
-        keys: {},
-        rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: 0,
-        // AÑADIR: Índice de personaje
-        characterIndex: characterIndex
-      });
-      
-      gameState.prizePool += data.bet;
-      
-      console.log(`Jugador ${clientId} asignado al personaje ${characterIndex}, tamaño: ${calculatePlayerSize(data.bet)}`);
-      
-      // AÑADIR: Iniciar física de sala de espera si es el primer jugador
-      if (gameState.players.size === 1 && gameState.gamePhase === 'waiting') {
-        startWaitingRoomPhysics();
+      // Si tenemos conexión blockchain, verificar si el jugador está en el contrato
+      if (blockchainConnected && data.address) {
+        verifyPlayerInBlockchain(data.address).then(isInGame => {
+          if (isInGame) {
+            console.log(`Jugador ${data.address} verificado en blockchain`);
+            addPlayerToGame(clientId, data);
+          } else {
+            console.log(`Jugador ${data.address} no encontrado en blockchain, enviando mensaje de error`);
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'No se encontró tu transacción en la blockchain. Por favor intenta de nuevo.'
+            }));
+          }
+        }).catch(error => {
+          console.error('Error verificando jugador en blockchain:', error);
+          // Si hay error en la verificación, permitir unirse de todos modos
+          addPlayerToGame(clientId, data);
+        });
+      } else {
+        // Sin conexión blockchain, permitir unirse sin verificación
+        addPlayerToGame(clientId, data);
       }
-      
-      broadcastGameState();
       break;
       
     case 'startGame':
       console.log(`Solicitud de inicio de juego. Jugadores: ${gameState.players.size}, Mínimo: ${SERVER_CONFIG.minPlayers}`);
       
-      // Verificar si hay suficientes jugadores (usando la configuración)
+      // Verificar si hay suficientes jugadores
       if (gameState.players.size >= SERVER_CONFIG.minPlayers) {
-        console.log(`Iniciando juego con ${gameState.players.size} jugadores (mínimo: ${SERVER_CONFIG.minPlayers})`);
+        console.log(`Iniciando juego con ${gameState.players.size} jugadores`);
         startGame();
       } else {
         console.log(`No se puede iniciar: insuficientes jugadores`);
@@ -176,13 +604,96 @@ function handleClientMessage(ws, clientId, data) {
       break;
       
     case 'playerInput':
-      // MODIFICAR: Actualizar inputs del jugador (ahora también en sala de espera)
+      // Actualizar inputs del jugador
       if (gameState.players.has(clientId)) {
         const player = gameState.players.get(clientId);
         player.keys = data.keys;
-        // En sala de espera también procesamos inputs, pero con menos frecuencia de broadcast
       }
       break;
+      
+    // AÑADIR: Nuevo tipo de mensaje para verificar estado blockchain
+    case 'checkBlockchainState':
+      if (blockchainConnected && data.address) {
+        verifyPlayerInBlockchain(data.address).then(isInGame => {
+          ws.send(JSON.stringify({
+            type: 'blockchainStateResult',
+            isInGame: isInGame,
+            address: data.address
+          }));
+        }).catch(error => {
+          console.error('Error verificando estado en blockchain:', error);
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Error verificando estado en blockchain'
+          }));
+        });
+      } else {
+        ws.send(JSON.stringify({
+          type: 'blockchainStateResult',
+          isInGame: false,
+          address: data.address,
+          error: 'Sin conexión blockchain'
+        }));
+      }
+      break;
+  }
+}
+
+// AÑADIR: Función auxiliar para añadir jugador al juego
+function addPlayerToGame(clientId, data) {
+  // Asignar personaje único
+  const characterIndex = getNextAvailableCharacter();
+  
+  // Añadir jugador al estado
+  gameState.players.set(clientId, {
+    id: clientId,
+    address: data.address,
+    bet: data.bet,
+    x: 300 + (Math.random() - 0.5) * 200,
+    y: 300 + (Math.random() - 0.5) * 200,
+    vx: 0,
+    vy: 0,
+    radius: calculatePlayerSize(data.bet),
+    color: data.color || `hsl(${Math.random() * 360}, 70%, 60%)`,
+    alive: true,
+    powerup: null,
+    powerupEndTime: 0,
+    keys: {},
+    rotation: Math.random() * Math.PI * 2,
+    rotationSpeed: 0,
+    characterIndex: characterIndex
+  });
+  
+  gameState.prizePool += data.bet;
+  
+  // Iniciar física de sala de espera si es el primer jugador
+  if (gameState.players.size === 1 && gameState.gamePhase === 'waiting') {
+    startWaitingRoomPhysics();
+  }
+  
+  broadcastGameState();
+  
+  // Verificar si el juego debe comenzar automáticamente
+  if (blockchainConnected) {
+    checkIfGameShouldAutostart();
+  }
+}
+
+// AÑADIR: Verificar si un jugador está en la blockchain
+async function verifyPlayerInBlockchain(address) {
+  if (!contract || !blockchainConnected) return false;
+  
+  try {
+    // Obtener lista de jugadores activos
+    const activePlayers = await contract.getActivePlayers();
+    
+    // Verificar si la dirección está en la lista
+    return activePlayers.some(player => 
+      player.toLowerCase() === address.toLowerCase()
+    );
+  } catch (error) {
+    console.error('Error verificando jugador en blockchain:', error);
+    return false;
   }
 }
 
